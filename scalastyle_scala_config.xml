@@ -116,9 +116,12 @@
  </check>
  <check level="warning" class="org.scalastyle.scalariform.FieldNamesChecker" enabled="true">
   <parameters>
-   <parameter name="regex"><![CDATA[^[a-z][A-Za-z]*$]]></parameter>
-   <!-- <parameter name="objectFieldRegex"><![CDATA[^[A-Z][A-Za-z]*$]]></parameter> -->
-   <parameter name="objectFieldRegex"><![CDATA[^[A-Za-z]*$]]></parameter>
+   <!--
+    <parameter name="regex"><![CDATA[^[a-z][A-Za-z]*$]]></parameter>
+    <parameter name="objectFieldRegex"><![CDATA[^[A-Z][A-Za-z]*$]]></parameter>
+    -->
+   <parameter name="regex"><![CDATA[^[a-z][A-Za-z0-9]*$]]></parameter>
+   <parameter name="objectFieldRegex"><![CDATA[^[A-Za-z][A-Za-z0-9]*$]]></parameter>
   </parameters>
  </check>
 </scalastyle>
