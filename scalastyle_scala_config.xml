@@ -118,7 +118,7 @@
   <parameters>
    <parameter name="regex"><![CDATA[^[a-z][A-Za-z]*$]]></parameter>
    <!-- <parameter name="objectFieldRegex"><![CDATA[^[A-Z][A-Za-z]*$]]></parameter> -->
-   <parameter name="objectFieldRegex"><![CDATA[^[a-z][A-Za-z]*$]]></parameter>
+   <parameter name="objectFieldRegex"><![CDATA[^[A-Za-z]*$]]></parameter>
   </parameters>
  </check>
 </scalastyle>
