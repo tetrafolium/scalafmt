@@ -16,7 +16,7 @@ inspecode:
   scalafmt:
     auto-fix: true
     #config-file: .scalafmt.conf     # (auto-detected)
-    #machine: { cpu: 0.5 }           # avoid OOM Killer
+    machine: { cpu: 0.5 }           # avoid OOM Killer
     thresholds: { num-issues: 25 }
 
   scalastyle:
