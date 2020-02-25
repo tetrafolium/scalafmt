@@ -15,10 +15,10 @@ inspecode:
 
   scalafmt:
     auto-fix: true
-    #config-file: .scalafmt.conf    # (auto-detected)
-    machine: { cpu: 0.5 }           # avoid OOM Killer
+    #config-file: .scalafmt.conf     # (auto-detected)
+    #machine: { cpu: 0.5 }           # avoid OOM Killer
     thresholds: { num-issues: 25 }
 
   scalastyle:
     config-file: scalastyle_scala_config.xml  # copy from tetrafolium/scalastyle/lib/
-    thresholds: { num-issues: 960 }
+    thresholds: { num-issues: 653 }
