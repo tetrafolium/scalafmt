@@ -11,7 +11,9 @@ class ReentrantCache[K, V] {
   private[this] var cache: Map[K, Future[V]] = Map.empty
 
   @tailrec
-  final def getOrAddToCache(key: K, shouldEvict: V => Boolean = _ => false)(get: () => V): V =
+  final def getOrAddToCache(key: K, shouldEvict: V => Boolean = _ => false)(
+      get: () => V
+  ): V =
     synchronized { // try to exit quickly from synchronized block
       cache.get(key) match {
         case Some(fut) => Right(fut)

@@ -22,8 +22,10 @@ final case class ScalafmtDynamic(
     defaultVersion: String,
     formatCache: ReentrantCache[String, FormatEval[ScalafmtReflect]],
     cacheConfigs: Boolean,
-    configsCache: ReentrantCache[Path, FormatEval[(ScalafmtReflectConfig, FileTime)]]
-) extends Scalafmt  {
+    configsCache: ReentrantCache[Path, FormatEval[
+      (ScalafmtReflectConfig, FileTime)
+    ]]
+) extends Scalafmt {
 
   def this() = this(
     ConsoleScalafmtReporter,
@@ -36,7 +38,11 @@ final case class ScalafmtDynamic(
   )
 
   override def clear(): Unit =
-    formatCache.clear().foreach(_.foreach(_.foreach(_.classLoader.close()))(ExecutionContext.global))
+    formatCache
+      .clear()
+      .foreach(
+        _.foreach(_.foreach(_.classLoader.close()))(ExecutionContext.global)
+      )
 
   override def withReporter(reporter: ScalafmtReporter): ScalafmtDynamic =
     copy(reporter = reporter)
@@ -106,12 +112,17 @@ final case class ScalafmtDynamic(
       Left(ScalafmtDynamicError.ConfigDoesNotExist(configPath))
     } else if (cacheConfigs) {
       val currentTimestamp: FileTime = Files.getLastModifiedTime(configPath)
-      configsCache.getOrAddToCache(configPath, _.exists(_._2.compareTo(currentTimestamp) != 0)) { () =>
-        resolveConfigWithScalafmt(configPath).map { config =>
-          reporter.parsedConfig(configPath, config.version)
-          (config, currentTimestamp)
+      configsCache
+        .getOrAddToCache(
+          configPath,
+          _.exists(_._2.compareTo(currentTimestamp) != 0)
+        ) { () =>
+          resolveConfigWithScalafmt(configPath).map { config =>
+            reporter.parsedConfig(configPath, config.version)
+            (config, currentTimestamp)
+          }
         }
-      }.map(_._1)
+        .map(_._1)
     } else {
       resolveConfigWithScalafmt(configPath)
     }

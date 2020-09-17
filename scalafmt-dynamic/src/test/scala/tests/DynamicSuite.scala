@@ -408,7 +408,9 @@ class DynamicSuite extends FunSuite with DiffAssertions {
         """.stripMargin
     )
     f.assertFormat()
-    val configOpt = f.dynamic.configsCache.getFromCache(f.config).flatMap(_.toOption.map(_._1))
+    val configOpt = f.dynamic.configsCache
+      .getFromCache(f.config)
+      .flatMap(_.toOption.map(_._1))
     assert(configOpt.nonEmpty)
     val config = configOpt.get
     assert(config.hasRewriteRules)
