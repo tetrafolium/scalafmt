@@ -10,7 +10,10 @@ import scala.scalajs._
 import java.util._
 
 class CopyOnWriteArrayList[E <: AnyRef] private (private var inner: js.Array[E])
-    extends List[E] with RandomAccess with Cloneable with Serializable {
+    extends List[E]
+    with RandomAccess
+    with Cloneable
+    with Serializable {
   self =>
 
   // requiresCopyOnWrite is false if and only if no other object
@@ -114,14 +117,16 @@ class CopyOnWriteArrayList[E <: AnyRef] private (private var inner: js.Array[E])
 
   def remove(o: scala.Any): Boolean = {
     val index = indexOf(o)
-    if (index == -1) false else {
+    if (index == -1) false
+    else {
       remove(index)
       true
     }
   }
 
   def addIfAbsent(e: E): Boolean = {
-    if (contains(e)) false else {
+    if (contains(e)) false
+    else {
       copyIfNeeded()
       innerPush(e)
       true
@@ -190,8 +195,8 @@ class CopyOnWriteArrayList[E <: AnyRef] private (private var inner: js.Array[E])
   }
 
   override def hashCode(): Int = {
-    iterator().foldLeft(1) {
-      (prev, elem) => 31 * prev + (if (elem == null) 0 else elem.hashCode)
+    iterator().foldLeft(1) { (prev, elem) =>
+      31 * prev + (if (elem == null) 0 else elem.hashCode)
     }
   }
 
@@ -221,7 +226,11 @@ class CopyOnWriteArrayList[E <: AnyRef] private (private var inner: js.Array[E])
   protected def innerPush(elem: E): Unit =
     inner.push(elem)
 
-  protected def innerSplice(index: Int, deleteCount: Int, items: E*): js.Array[E] =
+  protected def innerSplice(
+      index: Int,
+      deleteCount: Int,
+      items: E*
+  ): js.Array[E] =
     inner.splice(index, deleteCount, items: _*)
 
   protected def copyIfNeeded(): Unit = {
@@ -236,8 +245,10 @@ class CopyOnWriteArrayList[E <: AnyRef] private (private var inner: js.Array[E])
     inner
   }
 
-  private class CopyOnWriteArrayListView(fromIndex: Int, private var toIndex: Int)
-      extends CopyOnWriteArrayList[E](null: js.Array[E]) {
+  private class CopyOnWriteArrayListView(
+      fromIndex: Int,
+      private var toIndex: Int
+  ) extends CopyOnWriteArrayList[E](null: js.Array[E]) {
     viewSelf =>
 
     override def size(): Int =
@@ -251,9 +262,14 @@ class CopyOnWriteArrayList[E <: AnyRef] private (private var inner: js.Array[E])
 
     override def listIterator(index: Int): ListIterator[E] = {
       checkIndexOnBounds(index)
-      new CopyOnWriteArrayListIterator[E](innerSnapshot(), fromIndex + index,
-          fromIndex, toIndex) {
-        override protected def onSizeChanged(delta: Int): Unit = changeSize(delta)
+      new CopyOnWriteArrayListIterator[E](
+        innerSnapshot(),
+        fromIndex + index,
+        fromIndex,
+        toIndex
+      ) {
+        override protected def onSizeChanged(delta: Int): Unit =
+          changeSize(delta)
       }
     }
 
@@ -261,8 +277,10 @@ class CopyOnWriteArrayList[E <: AnyRef] private (private var inner: js.Array[E])
       if (fromIndex < 0 || fromIndex > toIndex || toIndex > size)
         throw new IndexOutOfBoundsException
 
-      new CopyOnWriteArrayListView(viewSelf.fromIndex + fromIndex,
-          viewSelf.fromIndex + toIndex) {
+      new CopyOnWriteArrayListView(
+        viewSelf.fromIndex + fromIndex,
+        viewSelf.fromIndex + toIndex
+      ) {
         override protected def changeSize(delta: Int): Unit = {
           super.changeSize(delta)
           viewSelf.changeSize(delta)
@@ -279,8 +297,11 @@ class CopyOnWriteArrayList[E <: AnyRef] private (private var inner: js.Array[E])
     override protected def innerSet(index: Int, elem: E): Unit =
       self.innerSet(fromIndex + index, elem)
 
-    override protected def innerSplice(index: Int, deleteCount: Int,
-        items: E*): js.Array[E] = {
+    override protected def innerSplice(
+        index: Int,
+        deleteCount: Int,
+        items: E*
+    ): js.Array[E] = {
       changeSize(items.size - deleteCount)
       self.innerSplice(fromIndex + index, deleteCount, items: _*)
     }
@@ -315,8 +336,12 @@ class CopyOnWriteArrayList[E <: AnyRef] private (private var inner: js.Array[E])
   }
 }
 
-private class CopyOnWriteArrayListIterator[E](arraySnapshot: js.Array[E], i: Int, start: Int, end: Int)
-    extends AbstractRandomAccessListIterator[E](i, start, end) {
+private class CopyOnWriteArrayListIterator[E](
+    arraySnapshot: js.Array[E],
+    i: Int,
+    start: Int,
+    end: Int
+) extends AbstractRandomAccessListIterator[E](i, start, end) {
   override def remove(): Unit =
     throw new UnsupportedOperationException
 
