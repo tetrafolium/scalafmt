@@ -8,20 +8,26 @@ package org.scalafmt.internal
 case class Decision(formatToken: FormatToken, splits: Seq[Split]) {
   import org.scalafmt.util.TokenOps._
 
-  def noNewlines: Decision =
-    Decision(formatToken, splits.filter(_.modification.isNewline))
+  def noNewlines: Seq[Split] =
+    splits.filterNot(_.isNL)
 
-  def onlyNewlines(implicit line: sourcecode.Line): Decision = {
-    val filtered = splits.filter(_.modification.isNewline)
-    if (filtered.nonEmpty) Decision(formatToken, filtered)
-    else Decision(formatToken, Seq(Split(Newline, 0)))
+  def onlyNewlinesWithFallback(default: => Split): Seq[Split] = {
+    val filtered = onlyNewlineSplits
+    if (filtered.nonEmpty) filtered else Seq(default)
   }
 
-  def forceNewline(implicit line: sourcecode.Line): Decision = {
-    if (isAttachedSingleLineComment(formatToken.right, formatToken.between))
-      this
-    else {
-      Decision(formatToken, splits.filter(_.modification.isNewline))
-    }
-  }
+  def forceNewline: Seq[Split] =
+    if (isAttachedSingleLineComment(formatToken))
+      splits
+    else
+      onlyNewlinesWithoutFallback
+
+  def onlyNewlinesWithoutFallback: Seq[Split] =
+    onlyNewlineSplits
+
+  private def onlyNewlineSplits: Seq[Split] =
+    splits.filter(_.isNL)
+
+  def withSplits(splits: Seq[Split]): Decision = copy(splits = splits)
+
 }

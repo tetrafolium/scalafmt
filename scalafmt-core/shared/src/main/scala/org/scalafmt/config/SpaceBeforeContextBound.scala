@@ -1,12 +1,12 @@
 package org.scalafmt.config
 
-import metaconfig.ConfCodec
-import metaconfig.ConfEncoder
-import metaconfig.Configured.Ok
-import metaconfig.{Conf, ConfDecoder}
+import metaconfig._
 import org.scalafmt.config.SpaceBeforeContextBound.{Always, IfMultipleBounds}
 
-sealed trait SpaceBeforeContextBound {
+sealed abstract class SpaceBeforeContextBound
+    extends Decodable[SpaceBeforeContextBound] {
+  override protected[config] def baseDecoder = SpaceBeforeContextBound.decoder
+
   def isIfMultipleBounds = this == IfMultipleBounds
   def isAlways = this == Always
 }
@@ -17,12 +17,12 @@ object SpaceBeforeContextBound {
     ReaderUtil.oneOf[SpaceBeforeContextBound](Always, Never, IfMultipleBounds)
 
   implicit val encoder: ConfEncoder[SpaceBeforeContextBound] = codec
-  implicit val reader: ConfDecoder[SpaceBeforeContextBound] =
-    ConfDecoder.instance[SpaceBeforeContextBound] {
-      case Conf.Bool(true) => Ok(Always)
-      case Conf.Bool(false) => Ok(Never)
-      case x => codec.read(x)
-    }
+  implicit val decoder: ConfDecoder[SpaceBeforeContextBound] = codec
+
+  implicit val preset: PartialFunction[Conf, SpaceBeforeContextBound] = {
+    case Conf.Bool(true) => Always
+    case Conf.Bool(false) => Never
+  }
 
   case object Always extends SpaceBeforeContextBound
   case object Never extends SpaceBeforeContextBound

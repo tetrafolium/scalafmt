@@ -7,7 +7,11 @@ You can use Scalafmt from your editor, build tool or terminal.
 
 ## IntelliJ
 
-The IntelliJ Scala plugin has built-in support for Scalafmt. When opening a
+The _Scala_ plugin compatible with recent versions of IntelliJ IDEA has
+_built-in_ support for Scalafmt (see **Note** below). _DO NOT_ install the
+deprecated _Scalafmt_ plugin unless you have an older version of Intellij.
+
+When opening a
 project that contains [a `.scalafmt.conf` file](configuration.md), you will be
 prompted to use it:
 
@@ -44,9 +48,8 @@ change this, and is instead recommended to format files when saving.
 
 - for the current project (recommended):
   `Preferences > Editor > Code Style > Scala`
-- for all new projects:  
-  `File > Other Settings > Preferences for New Projects… > Editor > Code Style >
-  Scala`
+- for all new projects:
+  `File > Other Settings > Preferences for New Projects… > Editor > Code Style > Scala`
 
 ![Enable format on save in IntelliJ](assets/img/intellij-on-save-native.png)
 
@@ -60,34 +63,94 @@ Scalafmt formatter:
 
 It is not possible to reset this setting for all existing projects.
 
+## VS Code
+
+You can use the [Metals](#metals) language server to format code with Scalafmt
+in VS Code. For more details, refer to the
+[Metals documentation](https://scalameta.org/metals/docs/editors/vscode.html).
+
+## Vim
+
+You can use the [Metals](#metals) language server to format code with Scalafmt
+in Vim and NeoVim. For more details, refer to the
+[Metals documentation](https://scalameta.org/metals/docs/editors/vim.html).
+
+## Emacs
+
+You can use the [Metals](#metals) language server to format code with Scalafmt
+in Emacs. For more details, refer to the [Metals
+documentation](https://scalameta.org/metals/docs/editors/emacs.html).
+
+The externally maintained
+[format-all](https://github.com/lassik/emacs-format-all-the-code) extension to
+Emacs also supports scalafmt as one of its formatters.
+
+## Sublime Text
+
+You can use the [Metals](#metals) language server to format code with Scalafmt
+in Sublime Text. For more details, refer to the
+[Metals documentation](https://scalameta.org/metals/docs/editors/sublime.html).
+
+## Eclipse
+
+You can use the [Metals](#metals) language server to format code with Scalafmt
+in Eclipse. For more details, refer to the
+[Metals documentation](https://scalameta.org/metals/docs/editors/eclipse.html).
+
+## Metals
+
+[Metals](https://scalameta.org/metals/) automatically uses Scalafmt to respond
+to formatting requests from the editor, according to the configuration defined
+in `.scalafmt.conf`.
+
+In most editors, if you there is no `.scalafmt.conf`, upon receiving the first
+format request Metals will create the `.scalafmt.conf` file for you.
+
+You can find more information on triggering a format request for individual
+editors in their respective parts of the
+[Metals site](https://scalameta.org/metals/docs/editors/overview.html).
+
 ## sbt
+
+NB: keep in mind that versions of `scalafmt-core` and `sbt-scalafmt` are released
+independently and don't have to align. The version of `scalafmt-core` is defined
+in the `.scalafmt.conf` configuration file and downloaded dynamically.
 
 ```scala
 // In project/plugins.sbt. Note, does not support sbt 0.13, only sbt 1.x.
-addSbtPlugin("org.scalameta" % "sbt-scalafmt" % "2.0.0")
-// or
-addSbtPlugin("com.geirsson" % "sbt-scalafmt" % "1.5.1") // before 1.6.0-RC4 
+addSbtPlugin("org.scalameta" % "sbt-scalafmt" % "2.4.0") // "2.4.0" is just sbt plugin version
 ```
 
 [![Maven Central](https://maven-badges.herokuapp.com/maven-central/org.scalameta/sbt-scalafmt/badge.svg)](https://maven-badges.herokuapp.com/maven-central/org.scalameta/sbt-scalafmt)
+
+To configure the scalafmt version add the following line into `.scalafmt.conf`:
+
+```
+version = @STABLE_VERSION@
+```
+
+The latest version will be used by default.
 
 ### Task keys
 
 - `myproject/scalafmt`: Format main sources of `myproject` project
 - `myproject/test:scalafmt`: Format test sources of `myproject` project
-- `scalafmtCheck`: Check if the scala sources under the project has been
+- `scalafmtCheck`: Check if the scala sources under the project have been
   formatted.
 - `scalafmtSbt`: Format `*.sbt` and `project/*.scala` files.
-- `scalafmtSbtCheck`: Check if the files has been formatted by `scalafmtSbt`.
+- `scalafmtSbtCheck`: Check if the files have been formatted by `scalafmtSbt`.
 - `scalafmtOnly`: Format a single given file.
-- `scalafmtAll`: Execute the scalafmt task for all configurations in which it is enabled. (By default this means the Compile and Test configurations.) (available as of v2.0.0-RC5)
-- `scalafmtCheckAll`: Execute the scalafmtCheck task for all configurations in which it is enabled. (By default this means the Compile and Test configurations.) (available as of v2.0.0-RC5)
+- `scalafmtAll`: Execute the scalafmt task for all configurations in which it is
+  enabled. (By default this means the Compile and Test configurations.)
+  (available as of v2.0.0-RC5)
+- `scalafmtCheckAll`: Execute the scalafmtCheck task for all configurations in
+  which it is enabled. (By default this means the Compile and Test
+  configurations.) (available as of v2.0.0-RC5)
 
 ### Customize configuration location
 
-- `scalafmtConfig: File`: The location of the `.scalafmt.conf`
-  configuration file. Defaults to the `.scalafmt.conf` file at the root of the
-  project.
+- `scalafmtConfig: File`: The location of the `.scalafmt.conf` configuration
+  file. Defaults to the `.scalafmt.conf` file at the root of the project.
 
 ### Format on compile
 
@@ -95,8 +158,8 @@ addSbtPlugin("com.geirsson" % "sbt-scalafmt" % "1.5.1") // before 1.6.0-RC4
   on compile. Default `false`.
 
 > ⚠️ This option is **discouraged** since it messes up undo buffers in the
-> editor and it slows down compilation.
-> It is recommended to use "format on save" in the editor instead.
+> editor and it slows down compilation. It is recommended to use "format on
+> save" in the editor instead.
 
 ### Enable IntegrationTest
 
@@ -111,7 +174,8 @@ inConfig(IntegrationTest)(org.scalafmt.sbt.ScalafmtPlugin.scalafmtConfigSettings
 ### Share configuration between builds
 
 To share configuration across different sbt builds, create a custom sbt plugin
-that generates `.scalafmt.conf` on build reload.
+that generates `.scalafmt-common.conf` on build reload, then include the
+generated file from `.scalafmt.conf`
 
 ```scala
 // project/MyScalafmtPlugin.scala
@@ -123,11 +187,26 @@ object MyScalafmtPlugin extends AutoPlugin {
     SettingKey[Unit]("scalafmtGenerateConfig") :=
       IO.write(
         // writes to file once when build is loaded
-        file(".scalafmt.conf"),
+        file(".scalafmt-common.conf"),
         "maxColumn = 100".stripMargin.getBytes("UTF-8")
       )
   }
 }
+```
+
+```
+// .scalafmt.conf
+include ".scalafmt-common.conf"
+```
+
+### Limit parallelism
+
+You can limit formatting parallelism for projects with multiple subprojects in your `build.sbt`:
+
+```scala
+import org.scalafmt.sbt.ConcurrentRestrictionTags
+
+Global / concurrentRestrictions += Tags.limit(org.scalafmt.sbt.ConcurrentRestrictionTags.Scalafmt, 4)
 ```
 
 ## CLI
@@ -138,30 +217,50 @@ The recommended way to install the scalafmt command line tool is with
 ### Coursier
 
 <div class="sidenote">
-To install Coursier see <a href="https://get-coursier.io/docs/cli-overview" target="_blank">here</a>
+To install Coursier see
+<a href="https://get-coursier.io/docs/cli-installation" target="_blank">here</a>
 </div>
 
-Create a standalone executable in `/usr/local/bin/scalafmt` with (sudo if
-necessary):
+#### install
+
+If you're using a recent version of `coursier` which supports direct
+[installation](https://get-coursier.io/docs/cli-overview.html#install)
+of packages, the simplest approach is by running
 
 ```sh
-coursier bootstrap org.scalameta:scalafmt-cli_2.12:@STABLE_VERSION@ \
-  -r sonatype:snapshots \
-  -o /usr/local/bin/scalafmt --standalone --main org.scalafmt.cli.Cli
+cs install scalafmt
 scalafmt --version # should be @STABLE_VERSION@
 ```
 
-Alternatively you can create a slim 15 KiB bootstrap script with:
+#### standalone
+
+Alternatively, you can create a complete standalone executable with:
 
 ```sh
-coursier bootstrap org.scalameta:scalafmt-cli_2.12:@STABLE_VERSION@ \
-  -r sonatype:snapshots \
-  -o scalafmt --main org.scalafmt.cli.Cli
+coursier bootstrap org.scalameta:scalafmt-cli_2.13:@STABLE_VERSION@ \
+  -r sonatype:snapshots --main org.scalafmt.cli.Cli \
+  --standalone \
+  -o scalafmt
 ./scalafmt --version # should be @STABLE_VERSION@
 ```
 
-It is **recommended** to put this bootstrap script in your code repository to
-make sure everyone on your team, as well as CI, uses the same scalafmt version.
+#### slim
+
+Finally, you can choose to obtain a slim 15 KiB bootstrap script instead with:
+
+```sh
+coursier bootstrap org.scalameta:scalafmt-cli_2.13:@STABLE_VERSION@ \
+  -r sonatype:snapshots --main org.scalafmt.cli.Cli \
+  -o scalafmt
+./scalafmt --version # should be @STABLE_VERSION@
+```
+
+If a `version` is defined in `.scalafmt.conf`, the CLI binary will honor it
+by automatically resolving and downloading the corresponding artifacts if it
+does not match its own version. Otherwise, it is **recommended** to put this
+bootstrap script in your code repository to make sure everyone on your team,
+as well as CI, uses the same scalafmt version.
+
 To configure which files to format, see [project](configuration.md#project).
 
 To customize the JVM options, use the Coursier option `--java-opt`, more info
@@ -173,20 +272,42 @@ coursier bootstrap --help | grep -A 1 "\-\-java-opt"
 
 ### Pre-release
 
-Our CI publishes a pre-release version of scalafmt to Sonatype Snapshots on every merge
-into master. To use a pre-release, replace @STABLE_VERSION@ with the version
-here:
+Our CI publishes a pre-release version of scalafmt to Sonatype Snapshots on
+every merge into master. To use a pre-release, replace @STABLE_VERSION@ with the
+version here:
 
 [![Sonatype Snapshots](https://img.shields.io/nexus/s/https/oss.sonatype.org/org.scalameta/scalafmt-cli_2.12.svg)](https://oss.sonatype.org/content/repositories/snapshots/org/scalameta/scalafmt-cli_2.12/)
 
-If you use coursier to install a pre-release, be sure to include the flag `-r
-sonatype:snapshots` so that the artifact can be resolved.
+If you use coursier to install a pre-release, be sure to include the flag
+`-r sonatype:snapshots` so that the artifact can be resolved.
 
 If you use sbt to install a pre-release, be sure to add the following setting:
 
 ```scala
 resolvers += Resolver.sonatypeRepo("snapshots")
 ```
+
+### Native image
+
+For macOS and Linux, it's possible to download pre-built GraalVm native binaries
+with instant startup and fast performance for short-lived Scalafmt runs.
+
+```sh
+VERSION=@STABLE_VERSION@
+INSTALL_LOCATION=/usr/local/bin/scalafmt-native
+curl https://raw.githubusercontent.com/scalameta/scalafmt/master/bin/install-scalafmt-native.sh | \
+  bash -s -- $VERSION $INSTALL_LOCATION
+scalafmt-native --help # should show version @STABLE_VERSION@
+```
+
+> The native image binaries have the limitation of working only with one version
+> of Scalafmt. The native binaries fail when the `version` setting in
+> `.scalafmt.conf` does not match the version of the native binary. It's
+> recommended to use the JVM binary if you expect to use Scalafmt in multiple
+> projects with different Scalafmt versions.
+
+Please see issue [#1569](https://github.com/scalameta/scalafmt/issues/1569) if
+you'd like to contribute support for building native images for Windows!
 
 ### Nailgun
 
@@ -199,9 +320,9 @@ vim/Emacs/Atom/Sublime/VS Code.
   necessary)
 
 ```sh
-coursier bootstrap --standalone org.scalameta:scalafmt-cli_2.12:@STABLE_VERSION@ \
-  -r sonatype:snapshots \
-  -o /usr/local/bin/scalafmt_ng -f --main com.martiansoftware.nailgun.NGServer
+coursier bootstrap --standalone org.scalameta:scalafmt-cli_2.13:@STABLE_VERSION@ \
+  -r sonatype:snapshots -f --main com.martiansoftware.nailgun.NGServer \
+  -o /usr/local/bin/scalafmt_ng
 scalafmt_ng & // start nailgun in background
 ng ng-alias scalafmt org.scalafmt.cli.Cli
 ng scalafmt --version # should be @STABLE_VERSION@
@@ -215,22 +336,27 @@ once in awhile.
 
 ### Homebrew
 
-You can install scalafmt via Homebrew using a custom formula
+The recommended way to install the scalafmt command line tool is with
+[Coursier](#coursier), itself available via Homebrew.
 
 ```sh
-brew install --HEAD olafurpg/scalafmt/scalafmt
+brew install coursier/formulas/coursier
+coursier install scalafmt
 scalafmt --version // should be @STABLE_VERSION@
-
-// to upgrade between releases
-brew upgrade scalafmt
 ```
+
+If necessary, make sure to follow the Coursier instructions for updating
+`$PATH` so that the `scalafmt` binary becomes available in your terminal.
 
 ### Arch Linux
 
-You can install scalafmt for Arch Linux from AUR. There is the [scalafmt-native](https://aur.archlinux.org/packages/scalafmt-native) package that installs scalafmt 
-binary built with GraalVM. GraalVM native binary provides instant startup without Nailgun.
+You can install scalafmt for Arch Linux from AUR. There is the
+[scalafmt-native-bin](https://aur.archlinux.org/packages/scalafmt-native-bin)
+package that installs scalafmt binary built with GraalVM. GraalVM native binary
+provides instant startup without Nailgun.
+
 ```sh
-yaourt -S scalafmt-native
+yaourt -S scalafmt-native-bin
 scalafmt --version // should be @STABLE_VERSION@
 ```
 
@@ -249,7 +375,7 @@ println(website.plaintext(org.scalafmt.cli.CliArgParser.scoptParser.usage))
 It is possible to use scalafmt in gradle with the following externally
 maintained plugins:
 
-- [Spotless](https://github.com/diffplug/spotless/tree/master/plugin-gradle#applying-scalafmt-to-scala-files)
+- [spotless](https://github.com/diffplug/spotless/tree/main/plugin-gradle#scalafmt)
 - [gradle-scalafmt](https://github.com/alenkacz/gradle-scalafmt)
 
 ## Maven
@@ -257,6 +383,7 @@ maintained plugins:
 It is possible to use scalafmt in Maven with the following externally maintained
 plugin:
 
+- [spotless](https://github.com/diffplug/spotless/tree/main/plugin-maven#scalafmt)
 - [mvn_scalafmt](https://github.com/SimonJPegg/mvn_scalafmt)
 
 ## Mill
@@ -264,23 +391,6 @@ plugin:
 Mill have scalafmt support built-in:
 
 - [scalafmt module](http://www.lihaoyi.com/mill/page/configuring-mill.html#reformatting-your-code)
-
-## Vim
-
-- Make sure you have the [CLI](#cli) installed and working.
-- install [vim-autoformat](https://github.com/Chiel92/vim-autoformat)
-- add to your `.vimrc`
-
-```
-noremap <F5> :Autoformat<CR>
-let g:formatdef_scalafmt = "'scalafmt --stdin'"
-let g:formatters_scala = ['scalafmt']
-```
-
-<div class="sidenote">
-You pay the JVM startup penalty on every format unless you're using
-<a href="#nailgun">Nailgun</a>.
-</div>
 
 ## Standalone library
 

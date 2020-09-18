@@ -13,6 +13,22 @@ val secret: List[Bit] = List(aaaaa, aaaaa, bbbbbbb, bbbbbbb, bbbbbbb, aaaaa,
   aaaaa, bbbbbbb, bbbbbbb, bbbbbbb, aaaaa, aaaaa, bbbbbbb, aaaaa, aaaaa,
   bbbbbbb, aaaaa, aaaaa, aaaaa, bbbbbbb, aaaaa, aaaaa, aaaaa, bbbbbbb, aaaaa,
   bbbbbbb)
+<<< basic with comment
+val secret: List[Bit] = List(aaaaa, aaaaa, bbbbbbb, bbbbbbb, bbbbbbb, aaaaa, bbbbbbb, aaaaa, bbbbbbb, bbbbbbb, bbbbbbb, aaaaa, aaaaa, bbbbbbb, bbbbbbb, aaaaa, bbbbbbb,
+  aaaaa, aaaaa, bbbbbbb, bbbbbbb, aaaaa, bbbbbbb, aaaaa, bbbbbbb, bbbbbbb, aaaaa, aaaaa, bbbbbbb, bbbbbbb, bbbbbbb, bbbbbbb, bbbbbbb, aaaaa, bbbbbbb, aaaaa, bbbbbbb, bbbbbbb, aaaaa, aaaaa, aaaaa, aaaaa, bbbbbbb,
+  aaaaa, bbbbbbb, bbbbbbb, bbbbbbb, aaaaa, aaaaa, bbbbbbb, aaaaa, aaaaa, bbbbbbb, aaaaa, aaaaa, aaaaa, bbbbbbb, aaaaa, aaaaa, aaaaa,
+  bbbbbbb, aaaaa, bbbbbbb // comment
+)
+>>>
+val secret: List[Bit] = List(aaaaa, aaaaa, bbbbbbb, bbbbbbb, bbbbbbb, aaaaa,
+  bbbbbbb, aaaaa, bbbbbbb, bbbbbbb, bbbbbbb, aaaaa, aaaaa, bbbbbbb, bbbbbbb,
+  aaaaa, bbbbbbb, aaaaa, aaaaa, bbbbbbb, bbbbbbb, aaaaa, bbbbbbb, aaaaa,
+  bbbbbbb, bbbbbbb, aaaaa, aaaaa, bbbbbbb, bbbbbbb, bbbbbbb, bbbbbbb, bbbbbbb,
+  aaaaa, bbbbbbb, aaaaa, bbbbbbb, bbbbbbb, aaaaa, aaaaa, aaaaa, aaaaa, bbbbbbb,
+  aaaaa, bbbbbbb, bbbbbbb, bbbbbbb, aaaaa, aaaaa, bbbbbbb, aaaaa, aaaaa,
+  bbbbbbb, aaaaa, aaaaa, aaaaa, bbbbbbb, aaaaa, aaaaa, aaaaa, bbbbbbb, aaaaa,
+  bbbbbbb // comment
+)
 <<< skip because a.select
 val secret: List[Bit] = List(a.select, aaaaa, bbbbbbb, bbbbbbb, bbbbbbb, aaaaa, aaaaa, bbbbbbb, aaaaa, aaaaa, bbbbbbb, aaaaa, aaaaa, aaaaa, bbbbbbb, aaaaa, aaaaa, aaaaa, bbbbbbb, aaaaa, bbbbbbb)
 >>>
@@ -39,3 +55,104 @@ val secret: List[Bit] = List(
   aaaaa,
   bbbbbbb
 )
+<<< unsafeCallSite forced newline
+maxColumn = 20
+binPack.unsafeCallSite = true
+===
+somethingVeryLong(bar{baz(
+  qux // c1
+  )}
+)
+>>>
+somethingVeryLong(
+  bar {
+    baz(
+      qux // c1
+    )
+  })
+<<< unsafeCallSite no split
+binPack.unsafeCallSite = true
+===
+val a = foo(bar{baz(
+  qux // comment
+  )}
+)
+>>>
+val a = foo(bar {
+  baz(
+    qux // comment
+  )
+})
+<<< literalsSingleLine=true
+binPack.literalsSingleLine = true
+===
+val secret: List[Bit] = List(select, aaaaa, bbbbbbb, bbbbbbb, bbbbbbb, aaaaa, aaaaa, bbbbbbb, aaaaa, aaaaa, aaaaa, bbbbbbb, aaaaa)
+>>>
+val secret: List[Bit] = List(
+  select, aaaaa, bbbbbbb, bbbbbbb, bbbbbbb, aaaaa, aaaaa, bbbbbbb, aaaaa, aaaaa, aaaaa, bbbbbbb, aaaaa)
+<<< literalsSingleLine=true, accept no split
+binPack.literalsSingleLine = true
+===
+val secret: List[Bit] = List(
+  (select, aaaaa, bbbbbbb, bbbbbbb, bbbbbbb, aaaaa, aaaaa, bbbbbbb, aaaaa, aaaaa, aaaaa, bbbbbbb, aaaaa),
+  (select, aaaaa, bbbbbbb, bbbbbbb, bbbbbbb, aaaaa, aaaaa, bbbbbbb, aaaaa, aaaaa, aaaaa, bbbbbbb, aaaaa))
+>>>
+val secret: List[Bit] = List(
+  (select, aaaaa, bbbbbbb, bbbbbbb, bbbbbbb, aaaaa, aaaaa, bbbbbbb, aaaaa, aaaaa, aaaaa, bbbbbbb, aaaaa),
+  (select, aaaaa, bbbbbbb, bbbbbbb, bbbbbbb, aaaaa, aaaaa, bbbbbbb, aaaaa, aaaaa, aaaaa, bbbbbbb, aaaaa)
+)
+<<< literalsIncludeSimpleApply 1
+binPack.literalsIncludeSimpleExpr = true
+===
+object a {
+val b = Seq(
+(1, "name", date, date, date, date, 1, "cnm", 1, "p2", email, "", "4", null, h1, a3, "cpm", 24f.?, "")
+)
+}
+>>>
+object a {
+  val b = Seq(
+    (1, "name", date, date, date, date, 1, "cnm", 1, "p2", email, "", "4", null,
+      h1, a3, "cpm", 24f.?, "")
+  )
+}
+<<< literalsIncludeSimpleApply 2
+binPack.literalsIncludeSimpleExpr = true
+===
+object a {
+val a = b(Seq(foo.bar), Some(Seq(1)), None, Some(1), 360, 0)
+    val expected = A(1, tenant, "name", None, Type, "definition", 1, "foo",
+    "bar","1", now, now)
+    val save = A(1, tenant, "name", None, Type, foo, 1, "bar",
+     "baz","1", null, null, foo(bar(baz.qux)))
+}
+>>>
+object a {
+  val a = b(Seq(foo.bar), Some(Seq(1)), None, Some(1), 360, 0)
+  val expected = A(1, tenant, "name", None, Type, "definition", 1, "foo", "bar",
+    "1", now, now)
+  val save = A(1, tenant, "name", None, Type, foo, 1, "bar", "baz", "1", null,
+    null, foo(bar(baz.qux)))
+}
+<<< literalsIncludeSimpleApply 3
+binPack.literalsIncludeSimpleExpr = true
+===
+object a {
+ val foo = Map(
+      "a" -> "b",
+      "c" -> Map("d" -> Seq(1, 2)),
+      "e" -> true,
+      "f" -> "g",
+      "h" -> 1
+     )
+}
+>>>
+object a {
+  val foo = Map(
+    "a" -> "b",
+    "c" -> Map("d" -> Seq(1, 2)),
+    "e" -> true,
+    "f" -> "g",
+    "h" -> 1
+  )
+}

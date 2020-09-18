@@ -2,9 +2,12 @@ package org.scalafmt.cli
 
 import com.martiansoftware.nailgun.NGContext
 import java.io.{InputStream, PrintStream}
+import java.nio.file.{Files, Paths}
+
 import org.scalafmt.Versions
 import org.scalafmt.util.AbsoluteFile
 
+import scala.io.Source
 import scala.util.control.NoStackTrace
 
 object Cli {
@@ -72,32 +75,89 @@ object Cli {
   }
 
   def getConfig(args: Array[String], init: CliOptions): Option[CliOptions] = {
-    CliArgParser.scoptParser.parse(args, init).map(CliOptions.auto(args, init))
+    val expandedArguments = expandArguments(args)
+    CliArgParser.scoptParser
+      .parse(expandedArguments, init)
+      .map(CliOptions.auto(expandedArguments, init))
+  }
+
+  private def expandArguments(args: Array[String]): Array[String] = {
+    args.flatMap {
+      case FileArgument(xs) => xs
+      case x => List(x)
+    }
+  }
+  private object FileArgument {
+    def unapply(arg: String): Option[Iterator[String]] = {
+      val atFile = arg.stripPrefix("@")
+      if (atFile eq arg) None // doesn't start with @
+      else if (atFile eq "-") Some(Source.stdin.getLines())
+      else if (!Files.isRegularFile(Paths.get(atFile))) None
+      else Some(Source.fromFile(atFile).getLines())
+    }
   }
 
   private[cli] def run(options: CliOptions): ExitCode = {
-    val termDisplayMessage =
-      if (options.testing) "Looking for unformatted files..."
-      else "Reformatting..."
-    if (options.debug) {
-      val pwd = options.common.workingDirectory.jfile.getPath
-      val out = options.info
-      out.println("Working directory: " + pwd)
+    findRunner(options) match {
+      case Left(message) =>
+        options.common.err.println(message)
+        ExitCode.UnsupportedVersion
+      case Right(runner) =>
+        runWithRunner(options, runner)
     }
+  }
 
+  private val isNativeImage: Boolean =
+    "true" == System.getProperty("scalafmt.native-image", "false")
+
+  private def findRunner(
+      options: CliOptions
+  ): Either[String, ScalafmtRunner] = {
     // Run format using
     // - `scalafmt-dynamic` if the specified `version` setting doesn't match build version.
     // - `scalafmt-core` if the specified `version` setting match with build version
     //   (or if the `version` is not specified).
-    val runner: ScalafmtRunner = options.version match {
-      case None => ScalafmtCoreRunner
-      case Some(v) if v == Versions.version =>
-        ScalafmtCoreRunner
-      case _ => ScalafmtDynamicRunner
+    options.version match {
+      case None =>
+        Right(ScalafmtCoreRunner)
+      case Some(v) =>
+        if (v == Versions.version) {
+          Right(ScalafmtCoreRunner)
+        } else if (isNativeImage) {
+          Left(
+            s"""error: invalid Scalafmt version.
+              |
+              |This Scalafmt installation has version '${Versions.version}' and the version configured in '${options.configPath}' is '${v}'.
+              |To fix this problem, add the following line to .scalafmt.conf:
+              |```
+              |version = '${Versions.version}'
+              |```
+              |
+              |NOTE: this error happens only when running a native Scalafmt binary.
+              |Scalafmt automatically installs and invokes the correct version of Scalafmt when running on the JVM.
+              |""".stripMargin
+          )
+        } else {
+          Right(ScalafmtDynamicRunner)
+        }
     }
+
+  }
+  private[cli] def runWithRunner(
+      options: CliOptions,
+      runner: ScalafmtRunner
+  ): ExitCode = {
+    val termDisplayMessage =
+      if (options.writeMode == WriteMode.Test)
+        "Looking for unformatted files..."
+      else "Reformatting..."
+    options.common.debug.println(
+      "Working directory: " + options.common.workingDirectory.jfile.getPath
+    )
+
     val exit = runner.run(options, termDisplayMessage)
 
-    if (options.testing) {
+    if (options.writeMode == WriteMode.Test) {
       if (exit.isOk) {
         options.common.out.println("All files are formatted with scalafmt :)")
       } else if (exit.is(ExitCode.TestError)) {
@@ -109,9 +169,11 @@ object Cli {
         options.common.out.println(s"error: $exit")
       }
     }
-    if (options.testing &&
+    if (
+      options.writeMode == WriteMode.Test &&
       !options.fatalWarnings &&
-      !exit.is(ExitCode.TestError)) {
+      !exit.is(ExitCode.TestError)
+    ) {
       // Ignore parse errors etc.
       ExitCode.Ok
     } else {

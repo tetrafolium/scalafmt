@@ -1,47 +1,54 @@
 package org.scalafmt.util
 
+import java.{util => ju}
 import scala.annotation.tailrec
+import scala.collection.mutable
 import scala.meta.Case
 import scala.meta.Ctor
 import scala.meta.Decl
 import scala.meta.Defn
 import scala.meta.Enumerator
-import scala.meta.Importer
+import scala.meta.Init
+import scala.meta.Lit
 import scala.meta.Mod
+import scala.meta.Name
 import scala.meta.Pat
 import scala.meta.Pkg
-import scala.meta.Source
+import scala.meta.Stat
 import scala.meta.Template
 import scala.meta.Term
 import scala.meta.Tree
 import scala.meta.Type
+import scala.meta.classifiers.Classifier
 import scala.meta.tokens.Token
 import scala.meta.tokens.Token._
 import scala.meta.tokens.Tokens
 import scala.reflect.ClassTag
 import scala.reflect.classTag
+
+import org.scalafmt.CompatCollections.JavaConverters._
 import org.scalafmt.Error
-import org.scalafmt.Error.UnexpectedTree
+import org.scalafmt.config.{DanglingParentheses, ScalafmtConfig}
 import org.scalafmt.internal.FormatToken
-import scala.meta.Init
 
 /**
-  * Stateless helper functions on [[scala.meta.Tree]].
+  * Stateless helper functions on `scala.meta.Tree`.
   */
 object TreeOps {
-  import LoggerOps._
   import TokenOps._
 
   @tailrec
-  def topTypeWith(typeWith: Type.With): Type.With = typeWith.parent match {
-    case Some(t: Type.With) => topTypeWith(t)
-    case _ => typeWith
-  }
+  def topTypeWith(typeWith: Type.With): Type.With =
+    typeWith.parent match {
+      case Some(t: Type.With) => topTypeWith(t)
+      case _ => typeWith
+    }
 
-  def withChain(top: Tree): Seq[Type.With] = top match {
-    case t: Type.With => t +: withChain(t.lhs)
-    case _ => Nil
-  }
+  def withChain(top: Tree): Seq[Type.With] =
+    top match {
+      case t: Type.With => t +: withChain(t.lhs)
+      case _ => Nil
+    }
 
   def getEnumStatements(enums: Seq[Enumerator]): Seq[Enumerator] = {
     val ret = Seq.newBuilder[Enumerator]
@@ -57,32 +64,37 @@ object TreeOps {
     ret.result()
   }
 
+  @tailrec
   def isBlockFunction(fun: Term.Function): Boolean =
-    fun.parent.exists {
-      case b: Term.Block =>
-        b.stats.lengthCompare(1) == 0 && b.stats.head.eq(fun)
-      case next: Term.Function =>
-        isBlockFunction(next)
-      case _ =>
-        false
+    fun.parent match {
+      case Some(b: Term.Block) => isSingleElement(b.stats, fun)
+      case Some(next: Term.Function) => isBlockFunction(next)
+      case _ => false
     }
 
-  def extractStatementsIfAny(tree: Tree): Seq[Tree] = tree match {
-    case b: Term.Block => b.stats
-    case b: Term.Function if isBlockFunction(b) => b.body :: Nil
-    case t: Pkg => t.stats
-    // TODO(olafur) would be nice to have an abstract "For" superclass.
-    case t: Term.For => getEnumStatements(t.enums)
-    case t: Term.ForYield => getEnumStatements(t.enums)
-    case t: Term.Match => t.cases
-    case t: Term.PartialFunction => t.cases
-    case t: Term.Try => t.catchp
-    case t: Type.Refine => t.stats
-    case t: scala.meta.Source => t.stats
-    case t: Template => t.stats
-    case t: Case if t.body.tokens.nonEmpty => Seq(t.body)
-    case _ => Seq.empty[Tree]
-  }
+  def isFunctionWithBraces(fun: Term.Function): Boolean =
+    fun.parent match {
+      case Some(b: Term.Block) => isSingleElement(b.stats, fun)
+      case _ => false
+    }
+
+  def extractStatementsIfAny(tree: Tree): Seq[Tree] =
+    tree match {
+      case b: Term.Block => b.stats
+      case b: Term.Function if isBlockFunction(b) => b.body :: Nil
+      case t: Pkg => t.stats
+      // TODO(olafur) would be nice to have an abstract "For" superclass.
+      case t: Term.For => getEnumStatements(t.enums)
+      case t: Term.ForYield => getEnumStatements(t.enums)
+      case t: Term.Match => t.cases
+      case t: Term.PartialFunction => t.cases
+      case t: Term.Try => t.catchp
+      case t: Type.Refine => t.stats
+      case t: scala.meta.Source => t.stats
+      case t: Template => t.stats
+      case t: Case if t.body.tokens.nonEmpty => Seq(t.body)
+      case _ => Seq.empty[Tree]
+    }
 
   def getDequeueSpots(tree: Tree): Set[TokenHash] = {
     val ret = Set.newBuilder[TokenHash]
@@ -98,32 +110,25 @@ object TreeOps {
     val ret = Map.newBuilder[TokenHash, Tree]
     ret.sizeHint(tree.tokens.length)
 
-    def addAll(trees: Seq[Tree]): Unit = {
-      trees.foreach { t =>
-        t.tokens.headOption.foreach { tok =>
-          ret += hash(tok) -> t
-        }
-      }
-    }
+    def addTok(token: Token, tree: Tree) = ret += hash(token) -> tree
+    def addTree(t: Tree, tree: Tree) =
+      t.tokens.find(!_.is[Trivia]).foreach(addTok(_, tree))
+    def addAll(trees: Seq[Tree]) = trees.foreach(x => addTree(x, x))
 
     def addDefn[T: ClassTag](mods: Seq[Mod], tree: Tree): Unit = {
       // Each @annotation gets a separate line
       val annotations = mods.filter(_.is[Mod.Annot])
       addAll(annotations)
-      val firstNonAnnotation: Token = mods
-        .collectFirst {
-          case x if !x.is[Mod.Annot] =>
-            // Non-annotation modifier, for example `sealed`/`abstract`
-            x.tokens.head
-        }
-        .getOrElse {
+      mods.find(!_.is[Mod.Annot]) match {
+        // Non-annotation modifier, for example `sealed`/`abstract`
+        case Some(x) => addTree(x, tree)
+        case _ =>
           // No non-annotation modifier exists, fallback to keyword like `object`
-          tree.tokens.find(x => classTag[T].runtimeClass.isInstance(x)) match {
-            case Some(x) => x
+          tree.tokens.find(classTag[T].runtimeClass.isInstance) match {
+            case Some(x) => addTok(x, tree)
             case None => throw Error.CantFindDefnToken[T](tree)
           }
-        }
-      ret += hash(firstNonAnnotation) -> tree
+      }
     }
 
     def loop(x: Tree): Unit = {
@@ -162,10 +167,10 @@ object TreeOps {
     var stack = List.empty[Token]
     tokens.foreach {
       case open @ (LeftBrace() | LeftBracket() | LeftParen() |
-          Interpolation.Start()) =>
+          Interpolation.Start() | Xml.Start() | Xml.SpliceStart()) =>
         stack = open :: stack
       case close @ (RightBrace() | RightBracket() | RightParen() |
-          Interpolation.End()) =>
+          Interpolation.End() | Xml.End() | Xml.SpliceEnd()) =>
         val open = stack.head
         assertValidParens(open, close)
         ret += hash(open) -> close
@@ -180,6 +185,8 @@ object TreeOps {
   def assertValidParens(open: Token, close: Token): Unit = {
     (open, close) match {
       case (Interpolation.Start(), Interpolation.End()) =>
+      case (Xml.Start(), Xml.End()) =>
+      case (Xml.SpliceStart(), Xml.SpliceEnd()) =>
       case (LeftBrace(), RightBrace()) =>
       case (LeftBracket(), RightBracket()) =>
       case (LeftParen(), RightParen()) =>
@@ -191,98 +198,137 @@ object TreeOps {
   /**
     * Creates lookup table from token offset to its closest scala.meta tree.
     */
-  def getOwners(tree: Tree): Map[TokenHash, Tree] = {
-    val result = Map.newBuilder[TokenHash, Tree]
-    def loop(x: Tree): Unit = {
-      x.tokens.foreach { tok =>
-        result += hash(tok) -> x
-      }
-      x.children.foreach(loop)
+  def getOwners(tree: Tree): collection.Map[TokenHash, Tree] = {
+    val result = new java.util.HashMap[TokenHash, Tree](2048)
+    val workList = new ju.LinkedList[Tree]()
+    workList.add(tree)
+    while (!workList.isEmpty) {
+      val x = workList.poll()
+      x.tokens.foreach { tok => result.put(hash(tok), x) }
+      workList.addAll(x.children.asJava)
     }
-    loop(tree)
-    result.result()
+    result.asScala
   }
 
-  @tailrec
-  final def childOf(child: Tree, tree: Tree): Boolean = {
-    child == tree || (child.parent match {
-      case Some(parent) => childOf(parent, tree)
-      case _ => false
-    })
-  }
-
-  def childOf(tok: Token, tree: Tree, owners: Map[TokenHash, Tree]): Boolean =
-    childOf(owners(hash(tok)), tree)
+  final def childOf(child: Tree, tree: Tree): Boolean =
+    findTreeOrParentSimple(child)(_ eq tree).isDefined
 
   @tailrec
-  final def parents(
-      tree: Tree,
-      accum: Seq[Tree] = Seq.empty[Tree]
-  ): Seq[Tree] = {
+  final def numParents(tree: Tree, cnt: Int = 0)(f: Tree => Boolean): Int =
     tree.parent match {
-      case Some(parent) => parents(parent, parent +: accum)
-      case _ => accum
+      case Some(p) => numParents(p, if (f(p)) 1 + cnt else cnt)(f)
+      case _ => cnt
     }
-  }
-
-  def isTopLevel(tree: Tree): Boolean = tree match {
-    case _: Pkg | _: Source => true
-    case _ => false
-  }
-
-  def isDefDef(tree: Tree): Boolean = tree match {
-    case _: Decl.Def | _: Defn.Def => true
-    case _ => false
-  }
-
-  def defDefReturnType(tree: Tree): Option[Type] = tree match {
-    case d: Decl.Def => Some(d.decltpe)
-    case d: Defn.Def => d.decltpe
-    case d: Defn.Val => d.decltpe
-    case d: Defn.Var => d.decltpe
-    case pat: Pat.Var => pat.parent.flatMap(defDefReturnType)
-    case name: Term.Name => name.parent.flatMap(defDefReturnType)
-    case _ => None
-  }
 
   /**
-    * Returns `true` if the [[Tree]] is a class, trait or def
+    * Returns first ancestor which matches the given predicate.
+    */
+  @tailrec
+  def findTreeOrParent(
+      tree: Tree
+  )(pred: Tree => Option[Boolean]): Option[Tree] =
+    pred(tree) match {
+      case Some(true) => Some(tree)
+      case Some(false) => None
+      case None =>
+        tree.parent match {
+          case None => None
+          case Some(p) => findTreeOrParent(p)(pred)
+        }
+    }
+  def findTreeOrParentSimple(
+      tree: Tree,
+      flag: Boolean = true
+  )(pred: Tree => Boolean): Option[Tree] =
+    findTreeOrParent(tree)(x => if (pred(x) == flag) Some(true) else None)
+
+  /**
+    * Returns first ancestor whose parent matches the given predicate.
+    */
+  @tailrec
+  def findTreeWithParent(
+      tree: Tree
+  )(pred: Tree => Option[Boolean]): Option[Tree] =
+    tree.parent match {
+      case None => None
+      case Some(p) =>
+        pred(p) match {
+          case Some(true) => Some(tree)
+          case Some(false) => None
+          case None => findTreeWithParent(p)(pred)
+        }
+    }
+  def findTreeWithParentSimple(
+      tree: Tree,
+      flag: Boolean = true
+  )(pred: Tree => Boolean): Option[Tree] =
+    findTreeWithParent(tree)(x => if (pred(x) == flag) Some(true) else None)
+
+  /**
+    * Returns first ancestor with a parent of a given type.
+    */
+  def findTreeWithParentOfType[A <: Tree](tree: Tree)(implicit
+      classifier: Classifier[Tree, A]
+  ): Option[Tree] =
+    findTreeWithParentSimple(tree)(classifier.apply)
+
+  /**
+    * Returns true if a matching ancestor of a given type exists.
+    */
+  @inline
+  def existsParentOfType[A <: Tree](
+      tree: Tree
+  )(implicit classifier: Classifier[Tree, A]): Boolean =
+    findTreeWithParentOfType[A](tree).isDefined
+
+  def isDefDef(tree: Tree): Boolean =
+    tree match {
+      case _: Decl.Def | _: Defn.Def => true
+      case _ => false
+    }
+
+  def defDefReturnType(tree: Tree): Option[Type] =
+    tree match {
+      case d: Decl.Def => Some(d.decltpe)
+      case d: Defn.Def => d.decltpe
+      case d: Defn.Val => d.decltpe
+      case d: Defn.Var => d.decltpe
+      case pat: Pat.Var => pat.parent.flatMap(defDefReturnType)
+      case name: Term.Name => name.parent.flatMap(defDefReturnType)
+      case _ => None
+    }
+
+  /**
+    * Returns `true` if the `scala.meta.Tree` is a class, trait or def
     *
     * For classes this includes primary and secondary Ctors.
     */
-  def isDefnSiteWithParams(tree: Tree): Boolean = tree match {
-    case _: Decl.Def | _: Defn.Def | _: Defn.Macro | _: Defn.Class |
-        _: Defn.Trait | _: Ctor.Secondary =>
-      true
-    case x: Ctor.Primary =>
-      x.parent.exists(isDefnSiteWithParams)
-    case _ => false
-  }
+  def isDefnSiteWithParams(tree: Tree): Boolean =
+    tree match {
+      case _: Decl.Def | _: Defn.Def | _: Defn.Macro | _: Defn.Class |
+          _: Defn.Trait | _: Ctor.Secondary =>
+        true
+      case x: Ctor.Primary =>
+        x.parent.exists(isDefnSiteWithParams)
+      case _ => false
+    }
 
   /**
-    * Returns `true` if the [[Tree]] is a definition site
+    * Returns `true` if the `scala.meta.Tree` is a definition site
     *
     * Currently, this includes everything from classes and defs to type
     * applications
     */
-  def isDefnSite(tree: Tree): Boolean = tree match {
-    case _: Decl.Def | _: Defn.Def | _: Defn.Macro | _: Defn.Class |
-        _: Defn.Trait | _: Ctor.Secondary | _: Decl.Type | _: Defn.Type |
-        _: Type.Apply | _: Type.Param | _: Type.Tuple =>
-      true
-    case _: Term.Function | _: Type.Function => true
-    case x: Ctor.Primary => x.parent.exists(isDefnSite)
-    case _ => false
-  }
-
-  def isBinPackDefnSite(tree: Tree): Boolean = tree match {
-    case _: Decl.Def | _: Defn.Def | _: Defn.Macro | _: Defn.Class |
-        _: Defn.Trait | _: Ctor.Secondary | _: Defn.Type | _: Type.Apply |
-        _: Type.Param | _: Type.Tuple =>
-      true
-    case x: Ctor.Primary => x.parent.exists(isBinPackDefnSite)
-    case _ => false
-  }
+  def isDefnSite(tree: Tree): Boolean =
+    tree match {
+      case _: Decl.Def | _: Defn.Def | _: Defn.Macro | _: Defn.Class |
+          _: Defn.Trait | _: Ctor.Secondary | _: Decl.Type | _: Defn.Type |
+          _: Type.Apply | _: Type.Param | _: Type.Tuple =>
+        true
+      case _: Term.Function | _: Type.Function => true
+      case x: Ctor.Primary => x.parent.exists(isDefnSite)
+      case _ => false
+    }
 
   /**
     * Returns true if open is "unnecessary".
@@ -292,177 +338,103 @@ object TreeOps {
     *
     * `(a(1))` will parse into the same tree as `a(1)`.
     */
-  def isSuperfluousParenthesis(open: Token, owner: Tree): Boolean = {
+  def isSuperfluousParenthesis(open: Token, owner: Tree): Boolean =
     open.is[LeftParen] &&
-    !isTuple(owner) &&
-    owner.tokens.headOption.contains(open)
-  }
+      isSuperfluousParenthesis(open.asInstanceOf[LeftParen], owner)
+
+  def isSuperfluousParenthesis(open: LeftParen, owner: Tree): Boolean =
+    !isTuple(owner) && owner.tokens.headOption.contains(open)
 
   def isFirstOrLastToken(token: Token, owner: Tree): Boolean = {
     owner.tokens.headOption.contains(token) ||
     owner.tokens.lastOption.contains(token)
   }
 
-  def isCallSite(tree: Tree): Boolean = tree match {
-    case _: Term.Apply | _: Type.Apply | _: Pat.Extract | _: Term.Super |
-        _: Pat.Tuple | _: Term.Tuple | _: Term.ApplyType | _: Term.Assign |
-        _: Init =>
-      true
-    case _ => false
-  }
+  def isCallSite(tree: Tree)(implicit style: ScalafmtConfig): Boolean =
+    tree match {
+      case _: Term.Apply | _: Type.Apply | _: Pat.Extract | _: Term.Super |
+          _: Pat.Tuple | _: Term.Tuple | _: Term.ApplyType | _: Term.Assign |
+          _: Init =>
+        true
+      case t: Term.ApplyInfix => style.newlines.formatInfix && t.args.length > 1
+      case _ => false
+    }
 
-  def isTuple(tree: Tree): Boolean = tree match {
-    case _: Pat.Tuple | _: Term.Tuple | _: Type.Tuple => true
-    case _ => false
-  }
+  def isTuple(tree: Tree): Boolean =
+    tree match {
+      case _: Pat.Tuple | _: Term.Tuple | _: Type.Tuple => true
+      case _ => false
+    }
 
-  def isDefnOrCallSite(tree: Tree): Boolean =
+  def isDefnOrCallSite(tree: Tree)(implicit style: ScalafmtConfig): Boolean =
     isDefnSite(tree) || isCallSite(tree)
 
-  def isImporterOrDefnOrCallSite(tree: Tree): Boolean = tree match {
-    case _: Importer => true
-    case _ => isDefnOrCallSite(tree)
-  }
+  def noSpaceBeforeOpeningParen(
+      tree: Tree
+  )(implicit style: ScalafmtConfig): Boolean =
+    !isTuple(tree) && isDefnOrCallSite(tree) && !tree.is[Term.Function]
 
-  def noSpaceBeforeOpeningParen(tree: Tree): Boolean =
-    !isTuple(tree) && isDefnOrCallSite(tree)
-
-  def isModPrivateProtected(tree: Tree): Boolean = tree match {
-    case _: Mod.Private | _: Mod.Protected => true
-    case _ => false
-  }
-
-  def isTypeVariant(tree: Tree): Boolean = tree match {
-    case _: Mod.Contravariant | _: Mod.Covariant => true
-    case _ => false
-  }
-
-  val splitApplyIntoLhsAndArgs: PartialFunction[Tree, (Tree, Seq[Tree])] = {
-    case t: Term.Apply => t.fun -> t.args
-    case t: Term.Super => t -> Seq(t.superp)
-    case t: Pat.Extract => t.fun -> t.args
-    case t: Pat.Tuple => t -> t.args
-    case t: Type.Apply => t.tpe -> t.args
-    case t: Term.ApplyType => t.fun -> t.targs
-    case t: Term.Tuple => t -> t.args
-    case t: Term.Function => t -> t.params
-    case t: Type.Function => t -> t.params
-    case t: Type.Tuple => t -> t.args
-    case t: Type.Param => t.name -> t.tparams
-    case t: Decl.Type => t.name -> t.tparams
-    case t: Defn.Type => t.name -> t.tparams
-    // TODO(olafur) flatten correct? Filter by this () section?
-    case t: Init => t.tpe -> t.argss.flatten
-    case t: Defn.Def => t.name -> t.paramss.flatten
-    case t: Defn.Macro => t.name -> t.paramss.flatten
-    case t: Decl.Def => t.name -> t.paramss.flatten
-    case t: Defn.Class => t.name -> t.ctor.paramss.flatten
-    case t: Defn.Trait => t.name -> t.ctor.paramss.flatten
-    case t: Ctor.Primary => t.name -> t.paramss.flatten
-    case t: Ctor.Secondary => t.name -> t.paramss.flatten
-  }
-
-  val splitApplyIntoLhsAndArgsLifted = splitApplyIntoLhsAndArgs.lift
-
-  def getApplyArgs(
-      formatToken: FormatToken,
-      leftOwner: Tree
-  ): (Tree, Seq[Tree]) = {
-    leftOwner match {
-      case t: Defn.Def if formatToken.left.is[LeftBracket] =>
-        t.name -> t.tparams
-      // TODO(olafur) missing Defn.Def with `(` case.
-      case _ =>
-        splitApplyIntoLhsAndArgsLifted(leftOwner).getOrElse {
-          logger.debug(s"""Unknown tree
-                          |${log(leftOwner.parent.get)}
-                          |${isDefnSite(leftOwner)}""".stripMargin)
-          throw UnexpectedTree[Term.Apply](leftOwner)
-        }
+  def isModPrivateProtected(tree: Tree): Boolean =
+    tree match {
+      case _: Mod.Private | _: Mod.Protected => true
+      case _ => false
     }
-  }
 
-  final def getSelectChain(select: Term.Select): Vector[Term.Select] = {
-    select +: getSelectChain(select, Vector.empty[Term.Select])
-  }
-
-  def isChainApplyParent(parent: Tree, child: Tree): Boolean =
-    splitApplyIntoLhsAndArgsLifted(parent).exists(_._1 == child)
-
-  @tailrec
-  final def getSelectChain(
-      child: Tree,
-      accum: Vector[Term.Select]
-  ): Vector[Term.Select] = {
-    child.parent match {
-      case Some(parent: Term.Select) =>
-        getSelectChain(parent, accum :+ parent)
-      case Some(parent) if isChainApplyParent(parent, child) =>
-        getSelectChain(parent, accum)
-      case els => accum
+  def isTypeVariant(tree: Tree): Boolean =
+    tree match {
+      case _: Mod.Contravariant | _: Mod.Covariant => true
+      case _ => false
     }
+
+  type CallParts = (Tree, Either[Seq[Tree], Seq[Seq[Tree]]])
+  val splitCallIntoParts: PartialFunction[Tree, CallParts] = {
+    case t: Term.Apply => (t.fun, Left(t.args))
+    case t: Term.Super => (t, Left(Seq(t.superp)))
+    case t: Pat.Extract => (t.fun, Left(t.args))
+    case t: Pat.Tuple => (t, Left(t.args))
+    case t: Type.Apply => (t.tpe, Left(t.args))
+    case t: Term.ApplyType => (t.fun, Left(t.targs))
+    case t: Term.Tuple => (t, Left(t.args))
+    case t: Term.Function => (t, Left(t.params))
+    case t: Type.Function => (t, Left(t.params))
+    case t: Type.Tuple => (t, Left(t.args))
+    case t: Init => (t.tpe, Right(t.argss))
+  }
+  object SplitCallIntoParts {
+    def unapply(tree: Tree): Option[CallParts] =
+      splitCallIntoParts.lift(tree)
   }
 
-  def startsSelectChain(tree: Tree): Boolean = tree match {
-    case select: Term.Select =>
-      !(existsChild(_.is[Term.Select])(select) &&
-        existsChild(splitApplyIntoLhsAndArgs.isDefinedAt)(select))
-    case _ => false
+  type DefnParts = (Seq[Mod], Name, Seq[Type.Param], Seq[Seq[Term.Param]])
+  val splitDefnIntoParts: PartialFunction[Tree, DefnParts] = {
+    // types
+    case t: Type.Param => (t.mods, t.name, t.tparams, Seq.empty)
+    case t: Decl.Type => (t.mods, t.name, t.tparams, Seq.empty)
+    case t: Defn.Type => (t.mods, t.name, t.tparams, Seq.empty)
+    // definitions
+    case t: Defn.Def => (t.mods, t.name, t.tparams, t.paramss)
+    case t: Defn.Macro => (t.mods, t.name, t.tparams, t.paramss)
+    case t: Decl.Def => (t.mods, t.name, t.tparams, t.paramss)
+    case t: Defn.Class => (t.mods, t.name, t.tparams, t.ctor.paramss)
+    case t: Defn.Trait => (t.mods, t.name, t.tparams, t.ctor.paramss)
+    case t: Ctor.Primary => (t.mods, t.name, Seq.empty, t.paramss)
+    case t: Ctor.Secondary => (t.mods, t.name, Seq.empty, t.paramss)
   }
-
-  /**
-    * Returns true tree has a child for which f(child) is true.
-    */
-  def existsChild(f: Tree => Boolean)(tree: Tree): Boolean = {
-    tree.children.exists(f) || tree.children.exists(existsChild(f))
+  object SplitDefnIntoParts {
+    def unapply(tree: Tree): Option[DefnParts] =
+      splitDefnIntoParts.lift(tree)
   }
 
   /**
     * How many parents of tree are Term.Apply?
     */
-  def nestedApplies(tree: Tree): Int = {
-    // TODO(olafur) optimize?
-    tree.parent.fold(0) {
-      case parent @ (_: Term.Apply | _: Term.ApplyInfix | _: Type.Apply) =>
-        1 + nestedApplies(parent)
-      case parent => nestedApplies(parent)
+  def nestedApplies(tree: Tree): Int =
+    numParents(tree) {
+      case _: Term.Apply | _: Term.ApplyInfix | _: Type.Apply => true
+      case _ => false
     }
-  }
 
-  // TODO(olafur) abstract with [[NestedApplies]]
-
-  def nestedSelect(tree: Tree): Int = {
-    tree.parent.fold(0) {
-      case parent: Term.Select => 1 + nestedSelect(parent)
-      case parent => nestedSelect(parent)
-    }
-  }
-
-  // TODO(olafur) scala.meta should make this easier.
-  def findSiblingGuard(
-      generator: Enumerator.Generator
-  ): Option[Enumerator.Guard] = {
-    for {
-      parent <- generator.parent if parent.is[Term.For] ||
-        parent.is[Term.ForYield]
-      sibling <- {
-        val enums = parent match {
-          case p: Term.For => p.enums
-          case p: Term.ForYield => p.enums
-        }
-        val i = enums.indexOf(generator)
-        if (i == -1)
-          throw new IllegalStateException(
-            s"Generator $generator is part of parents enums."
-          )
-        enums
-          .drop(i + 1)
-          .takeWhile(_.is[Enumerator.Guard])
-          .lastOption
-          .asInstanceOf[Option[Enumerator.Guard]]
-      }
-    } yield sibling
-  }
+  def nestedSelect(tree: Tree): Int = numParents(tree)(_.is[Term.Select])
 
   /**
     * Calculates depth to deepest child in tree.
@@ -473,12 +445,13 @@ object TreeOps {
     if (tree.children.isEmpty) 0
     else 1 + tree.children.map(treeDepth).max
 
-  def defBody(tree: Tree): Option[Tree] = tree match {
-    case t: Defn.Def => Some(t.body)
-    case t: Defn.Macro => Some(t.body)
-    case t: Ctor.Secondary => Some(t.init)
-    case _ => None
-  }
+  def defBody(tree: Tree): Option[Tree] =
+    tree match {
+      case t: Defn.Def => Some(t.body)
+      case t: Defn.Macro => Some(t.body)
+      case t: Ctor.Secondary => Some(t.init)
+      case _ => None
+    }
 
   @tailrec
   final def lastLambda(first: Term.Function): Term.Function =
@@ -490,27 +463,42 @@ object TreeOps {
       case _ => first
     }
 
-  final def isApplyInfix(op: Token.Ident, owner: Tree): Boolean =
-    owner.parent.exists {
-      case infix: Type.ApplyInfix => infix.op == owner
-      case infix: Term.ApplyInfix => infix.op == owner
-      case infix: Pat.ExtractInfix => infix.op == owner
+  final def isInfixOp(tree: Tree): Boolean =
+    tree.parent.exists {
+      case InfixApp(ia) => ia.op eq tree
       case _ => false
     }
 
+  final def asInfixApp(tree: Tree): Option[InfixApp] = InfixApp.unapply(tree)
+
+  @inline
+  final def asInfixApp(tree: Tree, flag: Boolean = true): Option[InfixApp] =
+    if (flag) asInfixApp(tree) else None
+
+  @inline
+  final def isInfixApp(tree: Tree): Boolean = asInfixApp(tree).isDefined
+
   @tailrec
-  final def isTopLevelInfixApplication(child: Tree): Boolean =
-    child.parent match {
-      case Some(parent) =>
-        parent match {
-          case _: Term.ApplyInfix | _: Type.ApplyInfix =>
-            isTopLevelInfixApplication(parent)
-          case _: Term.Block | _: Term.If | _: Term.While | _: Source => true
-          case fun: Term.Function => isBlockFunction(fun)
-          case _ => false
-        }
-      case _ => false
+  def findNextInfixInParent(tree: Tree, scope: Tree): Option[Name] =
+    tree.parent match {
+      case Some(t @ InfixApp(ia)) if tree ne scope =>
+        if (ia.lhs eq tree) Some(ia.op) else findNextInfixInParent(t, scope)
+      case _ => None
     }
+
+  def infixSequenceLength(app: InfixApp): Int = {
+    val queue = new mutable.Queue[InfixApp]()
+    queue += app
+    var length = 0
+    while (queue.nonEmpty) {
+      val elem = queue.dequeue()
+      length += 1
+      queue ++= (elem.lhs +: elem.rhs).collect {
+        case InfixApp(ia) => ia
+      }
+    }
+    length
+  }
 
   // procedure syntax has decltpe: Some("")
   def isProcedureSyntax(defn: Defn.Def): Boolean =
@@ -518,16 +506,177 @@ object TreeOps {
 
   // matches tree nodes that can be considered "top-level statement": package/object/trait/def/val
   object MaybeTopLevelStat {
-    def unapply(tree: Tree): Option[Tree] = tree match {
-      case _: Pkg | _: Defn | _: Decl => Some(tree)
+    def unapply(tree: Tree): Option[Tree] =
+      tree match {
+        case _: Pkg | _: Defn | _: Decl => Some(tree)
+        case _ => None
+      }
+  }
+
+  def isXmlBrace(owner: Tree): Boolean =
+    owner match {
+      case _: Term.Xml | _: Pat.Xml => true
+      case b: Term.Block => b.parent.exists(_.isInstanceOf[Term.Xml])
+      case _ => false
+    }
+
+  def getAssignAtSingleArgCallSite(tree: Tree): Option[Term.Assign] =
+    tree match {
+      case Term.Apply(_, List(fun: Term.Assign)) => Some(fun)
+      case _ => None
+    }
+
+  def isSingleElement(elements: List[Tree], value: Tree): Boolean =
+    elements.lengthCompare(1) == 0 && (value eq elements.head)
+
+  def getBlockSingleStat(b: Term.Block): Option[Stat] =
+    if (b.stats.lengthCompare(1) != 0) None else Some(b.stats.head)
+
+  def getTermSingleStat(t: Term): Option[Tree] =
+    t match {
+      case b: Term.Block => getBlockSingleStat(b)
+      case _ => Some(t)
+    }
+
+  def getTermLineSpan(b: Tree): Int =
+    if (b.tokens.isEmpty) 0
+    else {
+      val pos = b.pos
+      pos.endLine - pos.startLine
+    }
+
+  /**
+    * In cases like:
+    * {{{
+    *   class X(
+    *     implicit
+    *     private[this] val i1: Int,
+    *     private[this] var i2: String
+    * )
+    * }}}
+    *
+    * `val i1`, and `var i2` have a ``Mod.Implicit`` with empty tokens.
+    */
+  def isHiddenImplicit(m: Mod): Boolean =
+    m.tokens.isEmpty && m.is[Mod.Implicit]
+
+  def isExplicitImplicit(m: Mod): Boolean =
+    m.tokens.nonEmpty && m.is[Mod.Implicit]
+
+  def hasExplicitImplicit(param: Term.Param): Boolean =
+    param.mods.exists(isExplicitImplicit)
+
+  def shouldNotDangleAtDefnSite(
+      tree: Tree,
+      isVerticalMultiline: Boolean
+  )(implicit style: ScalafmtConfig): Boolean =
+    !style.danglingParentheses.defnSite || {
+      val excludeList =
+        if (isVerticalMultiline && style.danglingParentheses.exclude.isEmpty)
+          style.verticalMultiline.excludeDanglingParens
+        else
+          style.danglingParentheses.exclude
+      excludeList.nonEmpty && {
+        val exclude = tree match {
+          case _: Ctor.Primary | _: Defn.Class =>
+            DanglingParentheses.Exclude.`class`
+          case _: Defn.Trait => DanglingParentheses.Exclude.`trait`
+          case _: Defn.Def => DanglingParentheses.Exclude.`def`
+          case _ => null
+        }
+        null != exclude && excludeList.contains(exclude)
+      }
+    }
+
+  def isChildOfCaseClause(tree: Tree): Boolean =
+    findTreeWithParent(tree) {
+      case t: Case => Some(tree ne t.body)
+      case _: Pat => None
+      case _ => Some(false)
+    }.isDefined
+
+  object EndOfFirstCall {
+    def unapply(tree: Tree): Option[Token] =
+      traverse(tree, None).map(_.tokens.last)
+
+    @tailrec
+    private def traverse(tree: Tree, res: Option[Tree]): Option[Tree] =
+      tree match {
+        case t: Term.Select if res.isDefined => traverse(t.qual, Some(t.qual))
+        case t: Term.ApplyType => traverse(t.fun, Some(t))
+        case SplitCallIntoParts(fun, _) if fun ne tree =>
+          traverse(fun, Some(fun))
+        case _ => res
+      }
+  }
+
+  @tailrec
+  def findInterpolate(
+      tree: Tree,
+      res: Option[Term.Interpolate] = None
+  ): Option[Term.Interpolate] =
+    tree.parent match {
+      case Some(p: Term.Interpolate) => findInterpolate(p, Some(p))
+      case Some(p) => findInterpolate(p, res)
+      case _ => res
+    }
+
+  def getStripMarginChar(t: Tree): Option[Char] = {
+    t.parent match {
+      case Some(ts: Term.Select) if ts.name.value == "stripMargin" =>
+        ts.parent match {
+          case Some(Term.Apply(_, List(arg: Lit.Char))) => Some(arg.value)
+          case _ => Some('|')
+        }
       case _ => None
     }
   }
 
-  def isXmlBrace(owner: Tree): Boolean = owner match {
-    case _: Term.Xml | _: Pat.Xml => true
-    case b: Term.Block => b.parent.exists(_.isInstanceOf[Term.Xml])
-    case _ => false
+  @inline
+  def isTripleQuote(syntax: String): Boolean = syntax.startsWith("\"\"\"")
+
+  def getStripMarginChar(ft: FormatToken): Option[Char] = {
+    ft.left match {
+      case _: Token.Interpolation.Start =>
+        val ti = TreeOps.findInterpolate(ft.meta.leftOwner)
+        ti.flatMap(TreeOps.getStripMarginChar)
+      case _: Token.Constant.String if isTripleQuote(ft.meta.left.text) =>
+        TreeOps.getStripMarginChar(ft.meta.leftOwner)
+      case _ => None
+    }
   }
+
+  @tailrec
+  def findFirstTreeBetween(tree: Tree, beg: Token, end: Token): Option[Tree] = {
+    def isWithinRange(x: Tokens): Boolean = {
+      x.nonEmpty && x.head.start >= beg.start && x.last.end <= end.end
+    }
+    def matches(tree: Tree): Boolean = {
+      val x = tree.tokens
+      isWithinRange(x) ||
+      x.nonEmpty && x.head.start <= beg.start && x.last.end >= end.end
+    }
+    if (isWithinRange(tree.tokens)) Some(tree)
+    else
+      tree.children.find(matches) match {
+        case Some(c) => findFirstTreeBetween(c, beg, end)
+        case _ => None
+      }
+  }
+
+  @inline
+  def ifWithoutElse(t: Term.If) = t.elsep.is[Lit.Unit]
+
+  def cannotStartSelectChain(select: Term.Select): Boolean =
+    select.qual match {
+      case _: Term.Placeholder => true
+      case t: Term.Name => isSymbolicName(t.value)
+      case t: Term.Select => isSymbolicName(t.name.value)
+      case _ => false
+    }
+
+  // Redundant {} block around case statements
+  def isCaseBodyABlock(ft: FormatToken, caseStat: Case): Boolean =
+    ft.right.is[Token.LeftBrace] && (caseStat.body eq ft.meta.rightOwner)
 
 }

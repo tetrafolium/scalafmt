@@ -1,7 +1,7 @@
 package org.scalafmt.util
 
 import scala.sys.process.ProcessLogger
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 import scala.util.control.NonFatal
 import java.io.File
 
@@ -22,7 +22,7 @@ class GitOpsImpl(private[util] val workingDirectory: AbsoluteFile)
   private[util] def exec(cmd: Seq[String]): Try[Seq[String]] = {
     val gitRes: Try[String] = Try {
       val lastError = new StringBuilder
-      val swallowStderr = ProcessLogger(_ => Unit, err => lastError.append(err))
+      val swallowStderr = ProcessLogger(_ => (), err => lastError.append(err))
       try {
         sys.process
           .Process(cmd, workingDirectory.jfile)
@@ -37,21 +37,23 @@ class GitOpsImpl(private[util] val workingDirectory: AbsoluteFile)
           )
       }
     }
-    // Predef.augmentString = work around scala/bug#11125 on JDK 11
-    gitRes.map(augmentString(_).lines.toSeq)
+    gitRes.map(_.linesIterator.toSeq)
   }
 
-  override def lsTree(dir: AbsoluteFile): Seq[AbsoluteFile] =
+  override def lsTree(dir: AbsoluteFile): Seq[AbsoluteFile] = {
+    val cmd = Seq(
+      "git",
+      "ls-files",
+      "--full-name",
+      dir.path
+    )
     rootDir.fold(Seq.empty[AbsoluteFile]) { rtDir =>
-      exec(
-        Seq(
-          "git",
-          "ls-files",
-          "--full-name",
-          dir.path
-        )
-      ).getOrElse(Seq.empty).map(f => rtDir / f)
+      exec(cmd)
+        .getOrElse(Seq.empty)
+        .map(f => rtDir / f)
+        .filter(file => FileOps.isRegularFile(file.jfile))
     }
+  }
 
   override def rootDir: Option[AbsoluteFile] = {
     val cmd = Seq(
@@ -103,7 +105,7 @@ class GitOpsImpl(private[util] val workingDirectory: AbsoluteFile)
   private def extractPathPart(s: String): Try[String] =
     Try(
       Option(s)
-      // Checks if the line status states the file was renamed (E.g: `R  ORIG_PATH -> PATH`)
+        // Checks if the line status states the file was renamed (E.g: `R  ORIG_PATH -> PATH`)
         .filter(_.substring(0, 2).contains(renameStatusCode))
         // takes the part of the string after the `-> ` character sequence
         .map(_.split(renameStatusArrowDelimiter).last)

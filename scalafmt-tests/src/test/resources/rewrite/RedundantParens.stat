@@ -15,6 +15,25 @@ object a {
       if a
     } yield a
 }
+<<< basic (format:off)
+object a {
+// format: off
+  def c(b: List[Int]): List[Int] =
+    for {
+      a <- b
+      if ((a))
+    } yield a
+}
+
+>>>
+object a {
+// format: off
+  def c(b: List[Int]): List[Int] =
+    for {
+      a <- b
+      if ((a))
+    } yield a
+}
 <<< imbalanced sides
 object a {
   def c(b: List[Int]): List[Int] =
@@ -44,7 +63,7 @@ object a {
   def c(b: List[Int]): List[Int] =
     for {
       a <- b
-      if (a) || (a)
+      if a || a
     } yield a
 }
 <<< nested compound statement
@@ -60,7 +79,7 @@ object a {
   def c(b: List[Int]): List[Int] =
     for {
       a <- b
-      if ((a)) || ((a))
+      if a || a
     } yield a
 }
 <<< basic match
@@ -69,7 +88,7 @@ object a {
 }
 >>>
 object a {
-  b match { case _ if (a) => b }
+  b match { case _ if a => b }
 }
 <<< compound match
 object a {
@@ -77,7 +96,7 @@ object a {
 }
 >>>
 object a {
-  b match { case _ if (a) || (a) => b }
+  b match { case _ if a || a => b }
 }
 <<< nested compound match
 object a {
@@ -85,5 +104,317 @@ object a {
 }
 >>>
 object a {
-  b match { case _ if ((a) || (a)) => b }
+  b match { case _ if a || a => b }
+}
+<<< single-arg apply of a block 1
+object a {
+  a({ b => c })
+}
+>>>
+object a {
+  a { b => c }
+}
+<<< single-arg apply of a block 2
+object a {
+  a({ b; c })
+}
+>>>
+object a {
+  a { b; c }
+}
+<<< single-arg apply of a block 3
+object a {
+  (
+  a
+   { b; c }
+   )
+}
+>>>
+object a {
+  a { b; c }
+}
+<<< #1895 1
+object a {
+  val x = ((1))
+}
+>>>
+object a {
+  val x = 1
+}
+<<< #1895 2
+object a {
+  val z = ((insertData *> readDatabase(id)))
+}
+>>>
+object a {
+  val z = insertData *> readDatabase(id)
+}
+<<< #1895 3
+rewrite.rules = [AvoidInfix, RedundantParens]
+===
+object a {
+  val z = (((insertData) op (readDatabase(id))))
+  val z = (((insertData)
+   op (readDatabase(id))))
+}
+>>>
+object a {
+  val z = insertData.op(readDatabase(id))
+  val z = insertData
+    .op(readDatabase(id))
+}
+<<< #1895 4
+object a {
+  val a: (String, String) = ("abcde", "idfa")
+  val a: ((String, String)) = (("abcde", "idfa"))
+  val a = (("abcde", "idfa"))
+  val a = ((("abcde", "idfa")))
+  val (a, b) = ("abcde", "idfa")
+}
+>>>
+object a {
+  val a: (String, String) = ("abcde", "idfa")
+  val a: ((String, String)) = (("abcde", "idfa"))
+  val a = (("abcde", "idfa"))
+  val a = (("abcde", "idfa"))
+  val (a, b) = ("abcde", "idfa")
+}
+<<< #1895 5
+object a {
+  def a: (String, String) = ("abcde", "idfa")
+  def a: ((String, String)) = (("abcde", "idfa"))
+  def a = (("abcde", "idfa"))
+  def a = ((("abcde", "idfa")))
+}
+>>>
+object a {
+  def a: (String, String) = ("abcde", "idfa")
+  def a: ((String, String)) = (("abcde", "idfa"))
+  def a = (("abcde", "idfa"))
+  def a = (("abcde", "idfa"))
+}
+<<< #1895 6
+object a {
+  (a eq b) && (c match {
+    case d => true
+  })
+}
+>>>
+object a {
+  (a eq b) && (c match {
+    case d => true
+  })
+}
+<<< #1895 7
+object a {
+  b((a, b, c))
+}
+>>>
+object a {
+  b((a, b, c))
+}
+<<< #1903 1
+object a {
+  a == ((b, c, d))
+}
+>>>
+object a {
+  a == ((b, c, d))
+}
+<<< don't rewrite infix when AvoidInfix
+rewrite.rules = [AvoidInfix, RedundantParens]
+===
+object a {
+  join(a, b)(
+        (x, y) =>
+          where(
+            x.foo < maxRetry and
+              y.retryCount === x.bar and
+              task.status === Failed
+          )
+            select (task)
+            on (x.id === key and
+              y.id === key)
+      ).toList
+}
+>>>
+object a {
+  join(a, b)((x, y) =>
+    where(
+      (x.foo < maxRetry).and(y.retryCount === x.bar).and(task.status === Failed)
+    )
+      .select(task)
+      .on((x.id === key).and(y.id === key))
+  ).toList
+}
+<<< don't rewrite infix as rhs
+object a {
+  private val foo = ((bar == baz
+     || bar == baz)
+      || bar == baz)
+}
+>>>
+object a {
+  private val foo = ((bar == baz
+    || bar == baz)
+    || bar == baz)
+}
+<<< #1953
+object a {
+  scalacOptions ~= (_ filterNot (_ startsWith "-Xlint"))
+}
+>>>
+object a {
+  scalacOptions ~= (_ filterNot (_ startsWith "-Xlint"))
+}
+<<< Lit.Unit preserved
+object a {
+  print("") shouldBe (())
+}
+>>>
+object a {
+  print("") shouldBe (())
+}
+<<< yield without a space
+object a {
+  val x = for {
+    a <- b
+  } yield(a)
+}
+>>>
+object a {
+  val x = for {
+    a <- b
+  } yield a
+}
+<<< #2117 if without a space
+object a {
+  a match {
+    case a if(((a))) =>
+  }
+}
+>>>
+object a {
+  a match {
+    case a if a =>
+  }
+}
+<<< #2163
+val map = (Map("A" -> 1) - "Test" - "Test" - "Test" - "Test" - "Test"
+    - "Test" - "Test" - "Test" - "Test" - "Test" - "Test" - "Test" + "B" -> 2)
+>>>
+val map = (Map("A" -> 1) - "Test" - "Test" - "Test" - "Test" - "Test"
+  - "Test" - "Test" - "Test" - "Test" - "Test" - "Test" - "Test" + "B" -> 2)
+<<< #2194 1 match
+object a {
+  val b = c match {
+    case true if (d match {
+      case true  => true
+      case false => false
+    }) =>
+  }
+}
+>>>
+object a {
+  val b = c match {
+    case true if (d match {
+          case true  => true
+          case false => false
+        }) =>
+  }
+}
+<<< #2194 2 infix
+object a {
+  val b = c match {
+    case true if (d map {
+      case true  => true
+      case false => false
+    }) =>
+    case true if (d
+      map {
+        case true  => true
+        case false => false
+      }) =>
+  }
+}
+>>>
+object a {
+  val b = c match {
+    case true if d map {
+          case true  => true
+          case false => false
+        } =>
+    case true
+        if d
+          map {
+            case true  => true
+            case false => false
+          } =>
+  }
+}
+<<< #2194 3 apply with brace
+object a {
+  val b = c match {
+    case true if (d.map {
+      case true  => true
+      case false => false
+    }) =>
+  }
+}
+>>>
+object a {
+  val b = c match {
+    case true if d.map {
+          case true  => true
+          case false => false
+        } =>
+  }
+}
+<<< #2194 4 apply with paren
+object a {
+  val b = c match {
+    case true if (d.map({
+      case true  => true
+      case false => false
+    })) =>
+  }
+}
+>>>
+object a {
+  val b = c match {
+    case true if d.map({
+          case true  => true
+          case false => false
+        }) =>
+  }
+}
+<<< #2194 5 unary
+object a {
+  val b = c match {
+    case false if (+1) =>
+    case false if (-1) =>
+    case false if (~1) =>
+    case false if (!1) =>
+  }
+}
+>>>
+object a {
+  val b = c match {
+    case false if +1 =>
+    case false if -1 =>
+    case false if ~1 =>
+    case false if !1 =>
+  }
+}
+<<< parens for infix with interpolate
+object a {
+  the[Exception] thrownBy a should have message("b")
+  the[Exception] thrownBy a should have message(s"b")
+  the[Exception] thrownBy a should have message(f"b")
+}
+>>>
+object a {
+  the[Exception] thrownBy a should have message "b"
+  the[Exception] thrownBy a should have message s"b"
+  the[Exception] thrownBy a should have message f"b"
 }

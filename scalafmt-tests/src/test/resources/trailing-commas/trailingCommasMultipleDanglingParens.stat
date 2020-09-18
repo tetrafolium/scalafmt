@@ -1,0 +1,339 @@
+maxColumn = 30
+danglingParentheses.preset = true
+align.preset = none
+trailingCommas = multiple
+
+<<< should add a trailing comma on the last argument
+def method(
+    a: String,
+    b: String
+)
+>>>
+def method(
+    a: String,
+    b: String,
+)
+
+<<< should add a trailing comma when breaking into multiple lines
+def method(a: String, b: String)
+>>>
+def method(
+    a: String,
+    b: String,
+)
+
+<<< should not add a comma in a lambda body
+object Foo {
+  Some(1).map(data => {
+    data
+  })
+}
+>>>
+object Foo {
+  Some(1).map(data => {
+    data
+  })
+}
+
+<<< should not add a comma in a constructor body
+def this() = {
+  this(1)
+}
+>>>
+def this() = {
+  this(1)
+}
+
+<<< does not remove a legal (but weird) comma in a constructor body
+def this() = {
+  this(1),
+}
+>>>
+def this() = {
+  this(1),
+}
+
+
+<<< should not add a trailing comma when not breaking into multiple lines
+def m(a: Int, b: Int)
+>>>
+def m(a: Int, b: Int)
+
+<<< add trailing commas in type parameters lists
+def method[
+    ParameterA,
+    ParameterB
+](
+    a: String,
+    b: String
+)
+>>>
+def method[
+    ParameterA,
+    ParameterB,
+](
+    a: String,
+    b: String,
+)
+
+<<< add trailing commas in type parameters lists when breaking over multiple lines
+def method[ParameterA, ParameterB](a: String, b: String, c: String)
+>>>
+def method[
+    ParameterA,
+    ParameterB,
+](
+    a: String,
+    b: String,
+    c: String,
+)
+
+<<< add trailing commas in bin-packed imports
+import somepackage.someobject.{
+  memberA,
+  memberB
+}
+>>>
+import somepackage.someobject.{
+  memberA,
+  memberB,
+}
+<<< add trailing commas in bin-packed single import
+import somepackage.someobject.{
+  memberB
+}
+>>>
+import somepackage.someobject.{
+  memberB
+}
+<<< add trailing commas in bin-packed imports when breaking over multiple lines
+import somepackage.someobject.{memberA, memberB}
+>>>
+import somepackage.someobject.{
+  memberA,
+  memberB,
+}
+<<< add trailing commas in bin-packed single import when breaking over multiple lines
+import somepackage.someobject.{
+ memberB
+ }
+>>>
+import somepackage.someobject.{
+  memberB
+}
+<<< add trailing commas in class constructors
+class SomeClass(a: String, b: String)
+>>>
+class SomeClass(
+    a: String,
+    b: String,
+)
+
+<<< add trailingCommas in this
+object B {
+  class A(a: String, b: String)
+  new A("longstring", "anotherlongstring")
+}
+>>>
+object B {
+  class A(
+      a: String,
+      b: String,
+  )
+  new A(
+    "longstring",
+    "anotherlongstring",
+  )
+}
+
+<<< add trailing commas in Term.This
+class SomeClass(a: String, b: String) {
+  def SomeClass(a: Int) = this(a.toString, a.toString)
+}
+>>>
+class SomeClass(
+    a: String,
+    b: String,
+) {
+  def SomeClass(a: Int) =
+    this(
+      a.toString,
+      a.toString,
+    )
+}
+
+<<< add trailing commas in Pat.Extract
+val (
+  value1,
+  value2
+) = someMethod
+>>>
+val (
+  value1,
+  value2,
+) = someMethod
+
+
+<<< add trailing commas in Pat.Tuple
+lst.map { case (
+  value1,
+  value2
+) => value1 }
+>>>
+lst.map {
+  case (
+        value1,
+        value2,
+      ) =>
+    value1
+}
+<<< #1592 avoid single-arg lambda closing paren split with trailing comma
+maxColumn = 80
+optIn.breakChainOnFirstMethodDot = false
+===
+object Foo {
+  def xxxxxxxxxxxxxxxxxxx(struct1: Xxxxxxx, struct2: Xxxxxxx): Seq[Xxxxxxx] = {
+    (1, 2) match {
+      case (1, 2) =>
+        arg1.keys.toSet.union(arg2.keys.toSet).toSeq.flatMap { k =>
+          if (argOp1 == argOp2) {
+            xx(arg1(k), arg2(k))
+              .map(d => d.copy(path = Seq(op, Y(k)) ++ d.path))
+          }
+        }
+    }
+  }
+}
+>>>
+object Foo {
+  def xxxxxxxxxxxxxxxxxxx(struct1: Xxxxxxx, struct2: Xxxxxxx): Seq[Xxxxxxx] = {
+    (1, 2) match {
+      case (1, 2) =>
+        arg1.keys.toSet.union(arg2.keys.toSet).toSeq.flatMap { k =>
+          if (argOp1 == argOp2) {
+            xx(arg1(k), arg2(k))
+              .map(d => d.copy(path = Seq(op, Y(k)) ++ d.path))
+          }
+        }
+    }
+  }
+}
+<<< #1604 1: avoid single-arg assign closing paren split adding trailing comma
+{
+  Bbbbbbbbbbbbbb(ccccccccccc = // comment
+  dddddddd + eeeeeeee /* comment */)
+}
+>>>
+{
+  Bbbbbbbbbbbbbb(
+    ccccccccccc = // comment
+      dddddddd + eeeeeeee /* comment */
+  )
+}
+<<< #1604 2: avoid single-arg assign closing paren split keeping trailing comma
+{
+  Bbbbbbbbbbbbbb(ccccccccccc = // comment
+    dddddddd + eeeeeeee, /* comment */
+  )
+}
+>>>
+{
+  Bbbbbbbbbbbbbb(
+    ccccccccccc = // comment
+      dddddddd + eeeeeeee /* comment */
+  )
+}
+<<< #1667
+maxColumn = 80
+optIn.breakChainOnFirstMethodDot = false
+===
+object Foo {
+  def foo(): Unit = {
+    aaaaaaaaaaaaaaa(c, ddddddd).map { zzzzzzzzzz =>
+      val ccccc = zz.bbbbbb(EEEEE.xxx, Schema.String).toOption.flatMap {
+        case c: Seq[String] =>
+          xxxx(c, (v: String) => s"""\\"$v\\"""")(Schema.String).map(s =>
+            Yyyyyyyyyyyyyyyy("SSSSSSS", s),
+          )
+      }
+    }.get
+  }
+}
+>>>
+object Foo {
+  def foo(): Unit = {
+    aaaaaaaaaaaaaaa(c, ddddddd).map { zzzzzzzzzz =>
+      val ccccc = zz.bbbbbb(EEEEE.xxx, Schema.String).toOption.flatMap {
+        case c: Seq[String] =>
+          xxxx(c, (v: String) => s"""\\"$v\\"""")(Schema.String).map(s =>
+            Yyyyyyyyyyyyyyyy("SSSSSSS", s)
+          )
+      }
+    }.get
+  }
+}
+<<< #1667 test various scenarios
+object a {
+  class a[
+   t1,
+   t2 // comment
+  ](a1: Int,
+    a2: Int // comment
+  )(
+    b1: String,
+    b2: String // comment
+  )(implicit
+    c1: SomeType1,
+    c2: SomeType2 // comment
+  ) {
+    def this(
+      a1: Int,
+      a2: Int // comment
+    )(
+      b1: String,
+      b2: String // comment
+    )(implicit
+      c1: SomeType1,
+      c2: SomeType2 // comment
+    ) = this(
+      a1,
+      a2 // comment
+    ) (
+      b1,
+      b2 // comment
+    )
+  }
+}
+>>>
+object a {
+  class a[
+      t1,
+      t2, // comment
+  ](
+      a1: Int,
+      a2: Int, // comment
+  )(
+      b1: String,
+      b2: String, // comment
+  )(implicit
+      c1: SomeType1,
+      c2: SomeType2, // comment
+  ) {
+    def this(
+        a1: Int,
+        a2: Int, // comment
+    )(
+        b1: String,
+        b2: String, // comment
+    )(implicit
+        c1: SomeType1,
+        c2: SomeType2, // comment
+    ) = this(
+      a1,
+      a2, // comment
+    )(
+      b1,
+      b2, // comment
+    )
+  }
+}

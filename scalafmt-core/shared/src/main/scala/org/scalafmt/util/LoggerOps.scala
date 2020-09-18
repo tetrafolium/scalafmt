@@ -8,6 +8,8 @@ import scala.meta.tokens.Tokens
 
 import org.scalafmt.internal.FormatToken
 import org.scalafmt.internal.Split
+import org.scalafmt.internal.State
+
 import sourcecode.Text
 
 /**
@@ -20,12 +22,18 @@ object LoggerOps {
   def name2style[T](styles: Text[T]*): Map[String, T] =
     styles.map(x => x.source -> x.value).toMap
 
+  def log(s: State): String = {
+    val policies = s.policy.policies.map(_.toString).mkString("P[", ",", "]")
+    s"d=${s.depth} w=${s.cost} i=${s.indentation} col=${s.column}; $policies; s=${log(s.split)}"
+  }
   def log(split: Split): String = s"$split"
 
   def log(formatToken: FormatToken): String =
     s"""${log(formatToken.left)}
-       |${log(formatToken.between: _*)}
-       |${log(formatToken.right)}""".stripMargin
+      |${log(formatToken.between: _*)}
+      |${log(formatToken.right)}""".stripMargin
+
+  def log2(formatToken: FormatToken): String = formatToken.toString
 
   def escape(raw: String): String = {
     raw
@@ -33,16 +41,17 @@ object LoggerOps {
 
   def log(tokens: Token*): String = tokens.map(log).mkString("\n")
 
-  def cleanup(token: Token): String = token match {
-    case Literal() | Interpolation.Part(_) =>
-      escape(token.syntax).stripPrefix("\"").stripSuffix("\"")
-    case _ => token.syntax.replace("\n", "")
-  }
+  def cleanup(token: Token): String =
+    token match {
+      case Literal() | Interpolation.Part(_) =>
+        escape(token.syntax).stripPrefix("\"").stripSuffix("\"")
+      case _ => token.syntax.replace("\n", "")
+    }
 
   def log(tokens: Tokens): String = tokens.map(log).mkString("\n")
 
   def log(token: Token): String =
-    f"${cleanup(token).slice(0, 30)}%-30s ${getTokenClass(token)}"
+    f"[${token.end}]${cleanup(token).slice(0, 30)}%-30s ${getTokenClass(token)}"
 
   private def getTokenClass(token: Token) =
     token.getClass.getName.stripPrefix("scala.meta.tokens.Token$")
@@ -52,19 +61,23 @@ object LoggerOps {
       s"TOKENS: ${t.tokens.map(x => reveal(x.syntax)).mkString(",")}"
     if (tokensOnly) tokens
     else s"""TYPE: ${t.getClass.getName.stripPrefix("scala.meta.")}
-            |SOURCE: $t
-            |STRUCTURE: ${t.show[Structure]}
-            |$tokens
-            |""".stripMargin
+      |SOURCE: $t
+      |STRUCTURE: ${t.show[Structure]}
+      |$tokens
+      |""".stripMargin
   }
+
+  def logOpt(t: Option[Tree], tokensOnly: Boolean = false): String =
+    t.fold("")(log(_, tokensOnly))
 
   def stripTrailingSpace(s: String): String = s.replaceAll("\\s+\n", "\n")
 
-  def reveal(s: String): String = s.map {
-    case '\n' => '¶'
-    case ' ' => '∙'
-    case ch => ch
-  }
+  def reveal(s: String): String =
+    s.map {
+      case '\n' => '¶'
+      case ' ' => '∙'
+      case ch => ch
+    }
 
   def header[T](t: T): String = {
     val line = s"=" * (t.toString.length + 3)

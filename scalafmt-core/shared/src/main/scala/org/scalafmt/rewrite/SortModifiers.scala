@@ -1,27 +1,33 @@
 package org.scalafmt.rewrite
 
 import org.scalafmt.config.SortSettings._
+import org.scalafmt.util.TreeOps
 
-import scala.meta.Tree
 import scala.meta._
 
 object SortModifiers extends Rewrite {
+  override def create(implicit ctx: RewriteCtx): RewriteSession =
+    new SortModifiers
+}
 
-  override def rewrite(code: Tree, ctx: RewriteCtx): Seq[Patch] = {
-    implicit val order = ctx.style.rewrite.sortModifiers.order
+class SortModifiers(implicit ctx: RewriteCtx) extends RewriteSession {
 
-    /*
-     * in the case of Class, Object, and of class constructor parameters
-     * some Mods are immovable, e.g. 'case' in "case class X".
-     *
-     * The case of parameters is a bit more curious because there the
-     * "val" or "var" in, say:
-     * {{{
-     *   class Test(private final val x: Int)
-     * }}}
-     * are considered Mods, instead of being similar to `Defn.Val`, or `Defn.Var`.
-     */
-    val patchesOfPatches = code.collect {
+  private implicit val order = ctx.style.rewrite.sortModifiers.order
+
+  override def rewrite(tree: Tree): Unit =
+    tree match {
+
+      /*
+       * in the case of Class, Object, and of class constructor parameters
+       * some Mods are immovable, e.g. 'case' in "case class X".
+       *
+       * The case of parameters is a bit more curious because there the
+       * "val" or "var" in, say:
+       * {{{
+       *   class Test(private final val x: Int)
+       * }}}
+       * are considered Mods, instead of being similar to `Defn.Val`, or `Defn.Var`.
+       */
       case d: Decl.Def => sortMods(d.mods)
       case v: Decl.Val => sortMods(v.mods)
       case v: Decl.Var => sortMods(v.mods)
@@ -37,50 +43,33 @@ object SortModifiers extends Rewrite {
         sortMods(
           p.mods.filterNot(m => m.is[Mod.ValParam] || m.is[Mod.VarParam])
         )
+      case _ =>
     }
-    patchesOfPatches.flatten
-  }
 
-  private def sortMods(
-      oldMods: Seq[Mod]
-  )(implicit order: List[ModKey]): Seq[Patch] = {
-    if (oldMods.isEmpty) Nil
-    else {
-      val sanitized = oldMods.filterNot(isHiddenImplicit)
-      val sortedMods: Seq[Mod] = sanitized.sortWith(orderModsBy(order))
+  private def sortMods(oldMods: Seq[Mod]): Unit = {
+    if (oldMods.nonEmpty) {
+      // ignore implicit "implicit" whenever we sort, and apply patches
+      val sanitized = oldMods.filterNot(TreeOps.isHiddenImplicit)
+      val sortedMods: Seq[Mod] = sanitized.sortWith(orderModsBy)
 
-      sortedMods.zip(sanitized).flatMap {
+      ctx.addPatchSet(sortedMods.zip(sanitized).flatMap {
         case (next, old) =>
-          val removeOld = old.tokens.map(t => TokenPatch.Remove(t))
-          val addNext = TokenPatch.AddRight(old.tokens.head, next.syntax)
-          removeOld :+ addNext
-      }
+          if (next eq old) Seq.empty
+          else {
+            val removeOld = old.tokens.tail.map(TokenPatch.Remove)
+            val nextSyntax = next.tokens.syntax // XXX: not next.syntax!
+            val addNext = TokenPatch.Replace(old.tokens.head, nextSyntax)
+            removeOld :+ addNext
+          }
+      }: _*)
     }
-  }
-
-  /**
-    * In cases like:
-    * {{{
-    *   class X(
-    *     implicit
-    *     private[this] val i1: Int,
-    *     private[this] var i2: String
-    * )
-    * }}}
-    *
-    * `val i1`, and `var i2` have a ``Mod.Implicit`` with empty tokens.
-    * Therefore we want to completely ignore this "mod" whenever we sort,
-    * and apply patches
-    */
-  private def isHiddenImplicit(m: Mod): Boolean = {
-    m.tokens.isEmpty && m.is[Mod.Implicit]
   }
 
   /**
     * @return
     *   m1 < m2; according to the order given by the List
     */
-  private def orderModsBy(order: List[ModKey])(m1: Mod, m2: Mod): Boolean = {
+  private def orderModsBy(m1: Mod, m2: Mod): Boolean = {
     val idx1 = order.indexWhere(modCorrespondsToSettingKey(m1))
     val idx2 = order.indexWhere(modCorrespondsToSettingKey(m2))
     idx1 < idx2

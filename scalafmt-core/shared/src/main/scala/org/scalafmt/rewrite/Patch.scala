@@ -11,6 +11,8 @@ abstract class TokenPatch(val tok: Token, val newTok: String) extends TreePatch
 
 object TokenPatch {
   case class Remove(override val tok: Token) extends TokenPatch(tok, "")
+  case class Replace(override val tok: Token, override val newTok: String)
+      extends TokenPatch(tok, newTok)
   def AddRight(
       tok: Token,
       toAdd: String,
@@ -32,34 +34,22 @@ object TokenPatch {
 }
 
 object Patch {
-  def merge(a: TokenPatch, b: TokenPatch): TokenPatch = (a, b) match {
-    case (add1: Add, add2: Add) =>
-      Add(
-        add1.tok,
-        add1.addLeft + add2.addLeft,
-        add1.addRight + add2.addRight,
-        add1.keepTok && add2.keepTok
-      )
-    case (_: Remove, add: Add) => add.copy(keepTok = false)
-    case (add: Add, _: Remove) => add.copy(keepTok = false)
-    case (rem: Remove, _: Remove) => rem
-    case _ =>
-      sys.error(s"""Can't merge token patches:
-                   |1. $a
-                   |2. $b""".stripMargin)
-  }
+  def merge(a: TokenPatch, b: TokenPatch): TokenPatch =
+    (a, b) match {
+      case (add1: Add, add2: Add) =>
+        Add(
+          add1.tok,
+          add1.addLeft + add2.addLeft,
+          add1.addRight + add2.addRight,
+          add1.keepTok && add2.keepTok
+        )
+      case (_: Remove, add: Add) => add.copy(keepTok = false)
+      case (add: Add, _: Remove) => add.copy(keepTok = false)
+      case (rem: Remove, _: Remove) => rem
+      case _ =>
+        sys.error(s"""Can't merge token patches:
+          |1. $a
+          |2. $b""".stripMargin)
+    }
 
-  def apply(ast: Tree, patches: Seq[Patch])(
-      implicit ctx: RewriteCtx
-  ): String = {
-    val input = ast.tokens(ctx.style.runner.dialect)
-    val tokenPatches = patches.collect { case e: TokenPatch => e }
-    val patchMap: Map[(Int, Int), String] =
-      (tokenPatches)
-        .groupBy(t => t.tok.start -> t.tok.end)
-        .mapValues(_.reduce(merge).newTok)
-    input.toIterator
-      .map(x => patchMap.getOrElse(x.start -> x.end, x.syntax))
-      .mkString
-  }
 }

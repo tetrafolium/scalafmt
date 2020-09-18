@@ -1,11 +1,14 @@
 package org.scalafmt.cli
+
 import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
 import java.util.function.UnaryOperator
+import util.control.Breaks
 
 import metaconfig.Configured
 import org.scalafmt.Error.{MisformattedFile, NoMatchingFiles}
 import org.scalafmt.{Formatted, Scalafmt, Versions}
 import org.scalafmt.config.{FilterMatcher, ScalafmtConfig}
+import org.scalafmt.CompatCollections.ParConverters._
 import org.scalafmt.util.OsSpecific
 
 import scala.meta.internal.tokenizers.PlatformTokenizerCache
@@ -19,11 +22,10 @@ object ScalafmtCoreRunner extends ScalafmtRunner {
   ): ExitCode = {
     options.scalafmtConfig match {
       case Configured.NotOk(e) =>
-        if (!options.quiet) options.common.err.println(s"${e.msg}")
+        options.common.err.println(s"${e.msg}")
         ExitCode.UnexpectedError
       case Configured.Ok(scalafmtConf) =>
-        if (options.debug)
-          options.common.out.println(s"parsed config (v${Versions.version})")
+        options.common.debug.println(s"parsed config (v${Versions.version})")
         val filterMatcher: FilterMatcher = FilterMatcher(
           scalafmtConf.project.includeFilters
             .map(OsSpecific.fixSeparatorsInPathPattern),
@@ -31,7 +33,7 @@ object ScalafmtCoreRunner extends ScalafmtRunner {
             .map(OsSpecific.fixSeparatorsInPathPattern)
         )
 
-        val inputMethods = getInputMethods(options, Some(filterMatcher))
+        val inputMethods = getInputMethods(options, filterMatcher.matchesFile)
         if (inputMethods.isEmpty && options.mode.isEmpty && !options.stdIn)
           throw NoMatchingFiles
 
@@ -39,17 +41,20 @@ object ScalafmtCoreRunner extends ScalafmtRunner {
         val termDisplay =
           newTermDisplay(options, inputMethods, termDisplayMessage)
         val exitCode = new AtomicReference(ExitCode.Ok)
-        inputMethods.par.foreach { inputMethod =>
-          val code = handleFile(inputMethod, options, scalafmtConf)
-          exitCode.getAndUpdate(new UnaryOperator[ExitCode] {
-            override def apply(t: ExitCode): ExitCode =
-              ExitCode.merge(code, t)
-          })
-          PlatformTokenizerCache.megaCache.clear()
-          termDisplay.taskProgress(
-            termDisplayMessage,
-            counter.incrementAndGet()
-          )
+        Breaks.breakable {
+          inputMethods.par.foreach { inputMethod =>
+            val code = handleFile(inputMethod, options, scalafmtConf)
+            exitCode.getAndUpdate(new UnaryOperator[ExitCode] {
+              override def apply(t: ExitCode): ExitCode =
+                ExitCode.merge(code, t)
+            })
+            if (options.check && !code.isOk) Breaks.break
+            PlatformTokenizerCache.megaCache.clear()
+            termDisplay.taskProgress(
+              termDisplayMessage,
+              counter.incrementAndGet()
+            )
+          }
         }
         termDisplay.completedTask(termDisplayMessage, exitCode.get.isOk)
         termDisplay.stop()
@@ -73,22 +78,18 @@ object ScalafmtCoreRunner extends ScalafmtRunner {
   private[this] def unsafeHandleFile(
       inputMethod: InputMethod,
       options: CliOptions,
-      config: ScalafmtConfig
+      scalafmtConfig: ScalafmtConfig
   ): ExitCode = {
     val input = inputMethod.readInput(options)
-    val scalafmtConfig =
-      if (inputMethod.isSbt || inputMethod.isSc) config.forSbt
-      else config
-    val formatResult = Scalafmt.format(
+    val formatResult = Scalafmt.formatCode(
       input,
       scalafmtConfig,
       options.range,
       inputMethod.filename
     )
-    formatResult match {
+    formatResult.formatted match {
       case Formatted.Success(formatted) =>
         inputMethod.write(formatted, input, options)
-        ExitCode.Ok
       case Formatted.Failure(e) =>
         if (scalafmtConfig.runner.ignoreWarnings) {
           ExitCode.Ok // do nothing

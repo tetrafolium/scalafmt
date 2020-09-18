@@ -1,59 +1,65 @@
 package org.scalafmt.rewrite
 
-import scala.meta.{Importee, Tree, _}
+import scala.collection.mutable
+import scala.meta._
 
-case object ExpandImportSelectors extends Rewrite {
+object ExpandImportSelectors extends Rewrite {
 
-  override def rewrite(code: Tree, ctx: RewriteCtx): Seq[Patch] = {
-    val builder = Seq.newBuilder[Patch]
+  override def create(implicit ctx: RewriteCtx): RewriteSession =
+    new ExpandImportSelectors
 
-    code.traverse {
+  private case class Group(
+      patches: mutable.Builder[TokenPatch, Seq[TokenPatch]] = Seq.newBuilder,
+      imports: mutable.ArrayBuffer[String] = new mutable.ArrayBuffer
+  )
+
+}
+
+class ExpandImportSelectors(implicit ctx: RewriteCtx) extends RewriteSession {
+
+  import ExpandImportSelectors.Group
+
+  override def rewrite(tree: Tree): Unit =
+    tree match {
       case q"import ..$imports" =>
-        val groupedPatches: Map[Token, Seq[TokenPatch]] = imports
-          .map { `import` =>
-            val expandedImport = `import`.collect {
-              case importer @ Importer(path, importees) =>
-                val hasRenamesOrUnimports = importees.exists(
-                  importee =>
-                    importee.is[Importee.Rename] || importee
-                      .is[Importee.Unimport]
-                )
+        val groupedPatches = mutable.Map.empty[Token, Group]
+        imports.foreach { `import` =>
+          val parentTokens = `import`.parent.get.tokens
+          val group =
+            groupedPatches.getOrElseUpdate(parentTokens.head, new Group)
+          parentTokens.tail.foreach(x => group.patches += TokenPatch.Remove(x))
 
-                val hasWildcards = importees.exists(_.is[Importee.Wildcard])
+          `import`.traverse {
+            case importer @ Importer(path, importees) =>
+              val hasRenamesOrUnimports = importees.exists(importee =>
+                importee.is[Importee.Rename] || importee.is[Importee.Unimport]
+              )
 
-                if (hasWildcards && hasRenamesOrUnimports)
-                  Seq(s"import ${importer.syntax}")
-                else
-                  importees.collect {
-                    case importee: Importee =>
-                      if (importee.toString.contains("=>"))
-                        s"import $path.{$importee}"
-                      else
-                        s"import $path.$importee"
-                    case importee @ _ => importee
-                  }
-            }.flatten
-            val patchStr = expandedImport.mkString("\n")
+              val hasWildcards = importees.exists(_.is[Importee.Wildcard])
 
-            //TODO move up this side effect
-            `import`.parent.get.tokens.tail.foreach { tok =>
-              builder += TokenPatch.Remove(tok)
-            }
-
-            TokenPatch.AddRight(`import`.parent.get.tokens.head, patchStr)
+              if (hasWildcards && hasRenamesOrUnimports)
+                group.imports += s"import ${importer.syntax}"
+              else
+                importees.foreach { importee =>
+                  val importString = importee.toString
+                  val replacement =
+                    if (importString.contains("=>"))
+                      s"import $path.{$importString}"
+                    else
+                      s"import $path.$importString"
+                  group.imports += replacement
+                }
           }
-          .groupBy(_.tok)
+        }
 
-        val mergedPatches: Seq[Patch] = groupedPatches.values.map { patches =>
-          patches.reduce(
-            (p1: TokenPatch, p2: TokenPatch) =>
-              TokenPatch.AddRight(p1.tok, p1.newTok + "\n" + p2.newTok)
-          )
-        }.toSeq
+        groupedPatches.foreach {
+          case (tok, group) =>
+            group.patches +=
+              TokenPatch.AddRight(tok, group.imports.mkString("\n"))
+            ctx.addPatchSet(group.patches.result(): _*)
+        }
 
-        builder ++= mergedPatches
+      case _ =>
     }
 
-    builder.result()
-  }
 }

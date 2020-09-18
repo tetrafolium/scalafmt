@@ -14,8 +14,10 @@ object Report {
       div(
         h1(id := "title", "Heatmap"),
         explanation,
-        for (result <- results.sortBy(-_.maxVisitsOnSingleToken)
-          if result.test.name != "Warmup") yield {
+        for (
+          result <- results.sortBy(-_.maxVisitsOnSingleToken)
+          if result.test.name != "Warmup"
+        ) yield {
           div(
             h2(result.title),
             pre(
@@ -58,9 +60,9 @@ object Report {
   def explanation =
     div(
       p("""Formatting output from scalafmt's test suite.
-          |The formatter uses Dijkstra's shortest path to determine the
-          |formatting with the "cheapest" cost. The red regions are
-          |tokens the formatter visits often.
+        |The formatter uses Dijkstra's shortest path to determine the
+        |formatting with the "cheapest" cost. The red regions are
+        |tokens the formatter visits often.
         """.stripMargin),
       ul(
         li("Declaration arguments: bin packed"),
@@ -133,7 +135,7 @@ object Report {
   def mergeResults(after: Result, before: Result): Seq[FormatOutput] =
     after.tokens.zip(before.tokens).map {
       case (aft, bef) =>
-        FormatOutput(aft.token, aft.whitespace, aft.visits - bef.visits)
+        FormatOutput(aft.token, aft.visits - bef.visits)
     }
 
   def mkHtml(output: Seq[FormatOutput], scalaStyle: ScalafmtConfig): String = {
@@ -149,7 +151,6 @@ object Report {
         else s"rgb($redness, 256, $redness)" // green
       val html = span(background := styleBackground, x.token).render
       sb.append(html)
-      sb.append(x.whitespace.replace("\n\n", "\n\n"))
     }
     sb.toString()
   }

@@ -1,4 +1,4 @@
-align = more
+align.preset = more
 <<< => with comment
 x match {
   case 1 => 2 // this is a comment
@@ -80,10 +80,10 @@ libraryDependencies ++= Seq(
   "org.scala-lang"                 % "scala-compiler"  % scalaVersion.value % "test",
   "ch.qos.logback"                 % "logback-classic" % "1.1.6"            % "test",
   "com.googlecode.java-diff-utils" % "diffutils"       % "1.3.0"            % "test",
-  "com.ibm"                        %% "couchdb-scala"  % "0.6.0"            % "test",
-  "com.lihaoyi"                    %% "scalatags"      % "0.5.4"            % "test",
+  "com.ibm"                       %% "couchdb-scala"   % "0.6.0"            % "test",
+  "com.lihaoyi"                   %% "scalatags"       % "0.5.4"            % "test",
   "org.apache.commons"             % "commons-math3"   % "3.6"              % "test",
-  "org.scalatest"                  %%% "scalatest"     % Deps.scalatest     % "test"
+  "org.scalatest"                %%% "scalatest"       % Deps.scalatest     % "test"
 )
 <<< slick #138
 {
@@ -139,19 +139,19 @@ val colors = Map(
 }
 >>>
 {
-  addSbtPlugin("com.eed3si9n"        % "sbt-unidoc"             % "0.3.2")
-  addSbtPlugin("com.github.gseitz"   % "sbt-release"            % "1.0.0")
-  addSbtPlugin("com.jsuereth"        % "sbt-pgp"                % "1.0.0")
-  addSbtPlugin("com.typesafe.sbt"    % "sbt-ghpages"            % "0.5.3")
-  addSbtPlugin("com.typesafe.sbt"    % "sbt-site"               % "0.8.1")
-  addSbtPlugin("org.tpolecat"        % "tut-plugin"             % "0.4.0")
-  addSbtPlugin("pl.project13.scala"  % "sbt-jmh"                % "0.2.3")
-  addSbtPlugin("org.scalastyle"      %% "scalastyle-sbt-plugin" % "0.8.0")
-  addSbtPlugin("org.scoverage"       % "sbt-scoverage"          % "1.2.0")
-  addSbtPlugin("com.typesafe.sbt"    % "sbt-git"                % "0.8.4")
-  addSbtPlugin("org.scala-js"        % "sbt-scalajs"            % "0.6.8")
-  addSbtPlugin("com.github.tkawachi" % "sbt-doctest"            % "0.3.5")
-  addSbtPlugin("org.xerial.sbt"      % "sbt-sonatype"           % "1.1")
+  addSbtPlugin("com.eed3si9n"        % "sbt-unidoc"            % "0.3.2")
+  addSbtPlugin("com.github.gseitz"   % "sbt-release"           % "1.0.0")
+  addSbtPlugin("com.jsuereth"        % "sbt-pgp"               % "1.0.0")
+  addSbtPlugin("com.typesafe.sbt"    % "sbt-ghpages"           % "0.5.3")
+  addSbtPlugin("com.typesafe.sbt"    % "sbt-site"              % "0.8.1")
+  addSbtPlugin("org.tpolecat"        % "tut-plugin"            % "0.4.0")
+  addSbtPlugin("pl.project13.scala"  % "sbt-jmh"               % "0.2.3")
+  addSbtPlugin("org.scalastyle"     %% "scalastyle-sbt-plugin" % "0.8.0")
+  addSbtPlugin("org.scoverage"       % "sbt-scoverage"         % "1.2.0")
+  addSbtPlugin("com.typesafe.sbt"    % "sbt-git"               % "0.8.4")
+  addSbtPlugin("org.scala-js"        % "sbt-scalajs"           % "0.6.8")
+  addSbtPlugin("com.github.tkawachi" % "sbt-doctest"           % "0.3.5")
+  addSbtPlugin("org.xerial.sbt"      % "sbt-sonatype"          % "1.1")
 }
 <<< final val #138
 object a{
@@ -191,6 +191,16 @@ def f[A](x: A)(f: A => Int) = f(x) match {
   case 1   => true
   case 222 => false
 }
+<<< tricky regex #138 2
+def f[A](x: A)(f: A => Int) = f(x) match {
+  case 1 => true
+  case 222 => false
+}
+>>>
+def f[A](x: A)(f: A => Int) = f(x) match {
+  case 1   => true
+  case 222 => false
+}
 <<< conflicting number of columns
     libraryDependencies ++= Seq(
       "org.scala-lang" % "scala-reflect" % scalaVersion.value % "test",
@@ -199,9 +209,9 @@ def f[A](x: A)(f: A => Int) = f(x) match {
      )
 >>>
 libraryDependencies ++= Seq(
-  "org.scala-lang" % "scala-reflect" % scalaVersion.value % "test",
+  "org.scala-lang" % "scala-reflect"   % scalaVersion.value % "test",
   "org.scala-lang" % "scala-compiler",
-  "ch.qos.logback" % "logback-classic" % "1.1.6" % "test"
+  "ch.qos.logback" % "logback-classic" % "1.1.6"            % "test"
 )
 <<< 2x newline is respected
 class A {
@@ -309,6 +319,20 @@ object Cleaver {
     def join(x: A -> B): R  = f(x._1, x._2)
   }
 }
+<<< don't jump scope #152 2
+object Cleaver {
+   def apply[R, A, B](): Cleaver[R, A, B] = new Cleaver[R, A, B] {
+    def split(x: R): A -> B               = (l(x), r(x))
+    def join(x: A -> B): R                = f(x._1, x._2)
+   }
+ }
+>>>
+object Cleaver {
+  def apply[R, A, B](): Cleaver[R, A, B] = new Cleaver[R, A, B] {
+    def split(x: R): A -> B = (l(x), r(x))
+    def join(x: A -> B): R  = f(x._1, x._2)
+  }
+}
 <<< only align single-line statements
 {
 val a = function(1, b)
@@ -385,10 +409,9 @@ object mixed {
 >>>
 {
   if (cond) foo
-  else {
-    val chars = s.toCharArray
-  }
-  val prefix = "sbt.paths." + projectName + "." + uncapitalize(config.name) + "."
+  else { val chars = s.toCharArray }
+  val prefix =
+    "sbt.paths." + projectName + "." + uncapitalize(config.name) + "."
 }
 <<< #521
 x match {
@@ -417,8 +440,36 @@ Seq(
 >>>
 Seq(
   "com.github.seratch" %% "awscala"                     % "0.5.7",
-  "org.scalatest"      % "scalatest_2.11"               % "3.0.0" % Test,
+  "org.scalatest"       % "scalatest_2.11"              % "3.0.0" % Test,
   "org.scalamock"      %% "scalamock-scalatest-support" % "3.2.2" % Test
+)
+<<< #531 2
+Seq (
+  Seq(
+    Seq(a % b % c, a %% bb %%% ccc, aaa % bb % c),
+    Seq(aaa % bb % c, aaa %%% bb %% c, a % bb % ccc),
+    Seq(
+      aaa % bb % c,
+      aaaaa %%% bbbb %% ccc,
+      a % bb % ccc
+    ),
+    a % b % c %%%% a %% bb %%% ccc %%%% aaa % bb % c
+  ),
+  Seq(a % b % c, a %% bb %%% ccc, aaa % bb % c)
+)
+>>>
+Seq(
+  Seq(
+    Seq(a   % b  % c, a    %% bb %%% ccc, aaa % bb % c),
+    Seq(aaa % bb % c, aaa %%% bb  %% c, a     % bb % ccc),
+    Seq(
+      aaa     % bb    % c,
+      aaaaa %%% bbbb %% ccc,
+      a       % bb    % ccc
+    ),
+    a % b % c %%%% a %% bb %%% ccc %%%% aaa % bb % c
+  ),
+  Seq(a % b % c, a %% bb %%% ccc, aaa % bb % c)
 )
 <<< align comments in method chain
 foo
@@ -483,4 +534,466 @@ object x {
   println("foo bar") // comment
   // comment
   println("foo") // comment
+}
+<<< #1720 original, two SL comments
+type iovec = CStruct2[Ptr[Byte], // iov_base
+                        CSize] // iov_len
+>>>
+type iovec = CStruct2[
+  Ptr[Byte], // iov_base
+  CSize
+] // iov_len
+<<< #1720 with val
+val iovec = CStruct2[Ptr[Byte], // iov_base
+                        CSize](a) // iov_len
+>>>
+val iovec = CStruct2[
+  Ptr[Byte], // iov_base
+  CSize
+](a) // iov_len
+<<< #1720 no align
+align.preset = none
+===
+type iovec = CStruct2[Ptr[Byte], // iov_base
+                        CSize] // iov_len
+>>>
+type iovec = CStruct2[
+  Ptr[Byte], // iov_base
+  CSize
+] // iov_len
+<<< #1720 second SL comment
+type iovec = CStruct2[Ptr[Byte],
+                        CSize] // iov_len
+>>>
+type iovec = CStruct2[Ptr[Byte], CSize] // iov_len
+<<< #1720 first SL comment
+type iovec = CStruct2[Ptr[Byte], // iov_base
+                        CSize]
+>>>
+type iovec = CStruct2[
+  Ptr[Byte], // iov_base
+  CSize
+]
+<<< #1720 nested multi-arg type with two SL comments
+type iovec = CStruct2[Ptr[Byte, // iov_base
+                        CSize]] // iov_len
+>>>
+type iovec = CStruct2[Ptr[
+  Byte, // iov_base
+  CSize
+]] // iov_len
+<<< #1720 one arg with SL comment
+type iovec = CStruct2[Ptr[Byte] // iov_base
+                        ]
+>>>
+type iovec = CStruct2[
+  Ptr[Byte] // iov_base
+]
+<<< #1720 first inline comment
+type iovec = CStruct2[Ptr[Byte], /* iov_base */
+                        CSize]
+>>>
+type iovec = CStruct2[
+  Ptr[Byte], /* iov_base */
+  CSize
+]
+<<< #1720 first inline comment with apply
+val iovec = CStruct2(Ptr(Byte), /* iov_base */
+                        CSize)
+>>>
+val iovec = CStruct2(
+  Ptr(Byte), /* iov_base */
+  CSize
+)
+<<< pattern matching with tuples
+x match {
+  case 1 => a -> b
+  case 42 => abc -> 3
+}
+>>>
+x match {
+  case 1  => a   -> b
+  case 42 => abc -> 3
+}
+<<< #1896 1: long non-matching first
+align.preset = most
+align.tokens.add = [{code = "=", owner = "(Enumerator.Val|Defn.(Va(l|r)|Def|Type)|Term.Assign)"}]
+===
+object fmt {
+  val header  = JwtHeader(algorithm = Some(JwtAlgorithm.HMD5))
+  val claim   = JwtClaim(content = content)
+  val content = payload.toString
+}
+>>>
+object fmt {
+  val header  = JwtHeader(algorithm = Some(JwtAlgorithm.HMD5))
+  val claim   = JwtClaim(content = content)
+  val content = payload.toString
+}
+<<< #1896 2: short non-matching first
+align.preset = most
+align.tokens.add = [{code = "=", owner = "(Enumerator.Val|Defn.(Va(l|r)|Def|Type)|Term.Assign)"}]
+===
+object fmt {
+  val claim   = JwtClaim(content = content)
+  val header  = JwtHeader(algorithm = Some(JwtAlgorithm.HMD5))
+  val content = payload.toString
+}
+>>>
+object fmt {
+  val claim   = JwtClaim(content = content)
+  val header  = JwtHeader(algorithm = Some(JwtAlgorithm.HMD5))
+  val content = payload.toString
+}
+<<< #1896 3
+align.preset = most
+align.tokens.add = [{code = "=", owner = "(Enumerator.Val|Defn.(Va(l|r)|Def|Type)|Term.Assign)"}]
+===
+JwtClaim(
+  abc = cba,
+  content = content
+)
+>>>
+JwtClaim(
+  abc     = cba,
+  content = content
+)
+<<< #1504
+align.multiline = true
+===
+object a {
+  val stringFoo = thing.identifier match {
+    case foo : SuperFooBarIdentifier =>
+     "somestring" / "other_string" / foo.identifyingid
+    case tastyBar: TastyBarIdentifier =>
+     "something" / "other_other" ? ("arg1" -> tastyBar.ider) & ("limit" -> 111)
+    case unknown =>
+     throw new IllegalArgumentException(s"Not sure at all what kinda class this is: ${unknown.getClass}")
+  }
+}
+>>>
+object a {
+  val stringFoo = thing.identifier match {
+    case foo: SuperFooBarIdentifier   =>
+      "somestring" / "other_string" / foo.identifyingid
+    case tastyBar: TastyBarIdentifier =>
+      "something" / "other_other" ? ("arg1" -> tastyBar.ider) & ("limit" -> 111)
+    case unknown                      =>
+      throw new IllegalArgumentException(
+        s"Not sure at all what kinda class this is: ${unknown.getClass}"
+      )
+  }
+}
+<<< #1811 1 no blanks
+align.multiline = true
+===
+object a {
+  for {
+    a   <- Option(1)
+    bbb <- Option(2)
+    cccccc <- Option {
+      3
+    }
+    dd <- Option(4)
+  } yield ()
+}
+>>>
+object a {
+  for {
+    a      <- Option(1)
+    bbb    <- Option(2)
+    cccccc <- Option {
+      3
+    }
+    dd     <- Option(4)
+  } yield ()
+}
+<<< #1811 1 with blanks
+align.multiline = true
+===
+object a {
+  for {
+    a   <- Option(1)
+    bbb <- Option(2)
+
+    cccccc <- Option {
+      3
+    }
+
+    dd <- Option(4)
+  } yield ()
+}
+>>>
+object a {
+  for {
+    a   <- Option(1)
+    bbb <- Option(2)
+
+    cccccc <- Option {
+      3
+    }
+
+    dd <- Option(4)
+  } yield ()
+}
+<<< #1811 2
+align.multiline = true
+align.arrowEnumeratorGenerator = true
+===
+object a {
+  for {
+    a   <- Option(1)
+    bbb <- Option(2)
+    cccccc <- Option {
+      3
+    }
+    dd <- Option(4)
+  } yield ()
+}
+>>>
+object a {
+  for {
+    a      <- Option(1)
+    bbb    <- Option(2)
+    cccccc <- Option {
+                3
+              }
+    dd     <- Option(4)
+  } yield ()
+}
+<<< #1841 no blanks
+align.multiline = true
+===
+object a {
+  private[this] val pbClass       = Class.forName("java.lang.ProcessBuilder")
+  private[this] val redirectClass = pbClass.getClasses find (_.getSimpleName == "Redirect")
+}
+>>>
+object a {
+  private[this] val pbClass       = Class.forName("java.lang.ProcessBuilder")
+  private[this] val redirectClass =
+    pbClass.getClasses find (_.getSimpleName == "Redirect")
+}
+<<< #1841 with blanks
+align.multiline = true
+===
+object a {
+  private[this] val pbClass       = Class.forName("java.lang.ProcessBuilder")
+
+  private[this] val redirectClass = pbClass.getClasses find (_.getSimpleName == "Redirect")
+}
+>>>
+object a {
+  private[this] val pbClass = Class.forName("java.lang.ProcessBuilder")
+
+  private[this] val redirectClass =
+    pbClass.getClasses find (_.getSimpleName == "Redirect")
+}
+<<< multiline with blanks
+align.preset = most
+===
+object a {
+  def foo: Int = {
+    val x = ???
+    42
+  }
+
+  def bar: Int = {
+    for { x <- "hey" } yield x
+    42
+  }
+
+  def fooBig: Int = {
+    42
+  }
+
+  def fooBigger: Int = {
+    42
+  }
+}
+>>>
+object a {
+  def foo: Int = {
+    val x = ???
+    42
+  }
+
+  def bar: Int = {
+    for { x <- "hey" } yield x
+    42
+  }
+
+  def fooBig: Int = {
+    42
+  }
+
+  def fooBigger: Int = {
+    42
+  }
+}
+<<< multiline with blanks and comments and no blocks
+align.preset = most
+===
+object a {
+  def foo: Int =
+    42
+  // comment
+
+  def fooBar: Int =
+    42
+
+  /* comment */
+  def fooBarBaz: Int =
+    42
+
+  // comment
+  def fooBarBazQux: Int =
+    42
+}
+>>>
+object a {
+  def foo: Int =
+    42
+  // comment
+
+  def fooBar: Int =
+    42
+
+  /* comment */
+  def fooBarBaz: Int =
+    42
+
+  // comment
+  def fooBarBazQux: Int =
+    42
+}
+<<< multiline without blanks
+align.preset = most
+===
+object a {
+  def foo: Int = {
+    val x = ???
+    42
+  }
+  def bar: Int = {
+    for { x <- "hey" } yield x
+    42
+  }
+  def fooBig: Int = {
+    42
+  }
+  def fooBigger: Int = {
+    42
+  }
+}
+>>>
+object a {
+  def foo: Int = {
+    val x = ???
+    42
+  }
+  def bar: Int = {
+    for { x <- "hey" } yield x
+    42
+  }
+  def fooBig: Int = {
+    42
+  }
+  def fooBigger: Int = {
+    42
+  }
+}
+<<< singleline def without blanks
+object a {
+  def a: Int = b % c
+  def aa: Int = bb % cc
+  def aaa: Int = bbb % ccc
+}
+>>>
+object a {
+  def a: Int   = b   % c
+  def aa: Int  = bb  % cc
+  def aaa: Int = bbb % ccc
+}
+<<< singleline def with blocks and without blanks
+object a {
+  def a: Int = { b % c }
+  def aa: Int = { bb % cc }
+  def aaa: Int = { bbb % ccc }
+}
+>>>
+object a {
+  def a: Int = { b % c }
+  def aa: Int = { bb % cc }
+  def aaa: Int = { bbb % ccc }
+}
+<<< singleline val without blanks
+object a {
+  val a: Int = b % c
+  val aa: Int = bb % cc
+  val aaa: Int = bbb % ccc
+}
+>>>
+object a {
+  val a: Int   = b   % c
+  val aa: Int  = bb  % cc
+  val aaa: Int = bbb % ccc
+}
+<<< singleline val with blocks and without blanks
+object a {
+  val a: Int = { b % c }
+  val aa: Int = { bb % cc }
+  val aaa: Int = { bbb % ccc }
+}
+>>>
+object a {
+  val a: Int = { b % c }
+  val aa: Int = { bb % cc }
+  val aaa: Int = { bbb % ccc }
+}
+<<< #1948
+align.preset = most
+===
+for {
+  aaa <- bbb % ccc
+  a <- b % c.map { x =>
+    x * x
+  }
+} yield (a, aaa)
+>>>
+for {
+  aaa <- bbb % ccc
+  a   <- b   % c.map { x =>
+           x * x
+         }
+} yield (a, aaa)
+<<< #2151 with blank line
+align.multiline = true
+===
+val x = blar match {
+  case a  =>
+    ???
+
+  case aaaaaaaaaa => ???
+}
+>>>
+val x = blar match {
+  case a =>
+    ???
+
+  case aaaaaaaaaa => ???
+}
+<<< #2151 without blank line
+align.multiline = true
+===
+val x = blar match {
+  case a  =>
+    ???
+  case aaaaaaaaaa => ???
+}
+>>>
+val x = blar match {
+  case a          =>
+    ???
+  case aaaaaaaaaa => ???
 }

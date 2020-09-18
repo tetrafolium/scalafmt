@@ -37,11 +37,11 @@ object a {
       iv: Option[String]
   ): dim.MerchantDna =
     dim.MerchantDna(
-      primaryRecurPeriod = subsDna.flatMap { _.primary },
-      weekly = subsDna.map { _.weekly }.getOrElse(false),
-      monthly = subsDna.map { _.monthly }.getOrElse(false),
-      quarterly = subsDna.map { _.quarterly }.getOrElse(false),
-      annual = subsDna.map { _.annual }.getOrElse(false),
+      primaryRecurPeriod = subsDna.flatMap(_.primary),
+      weekly = subsDna.map(_.weekly).getOrElse(false),
+      monthly = subsDna.map(_.monthly).getOrElse(false),
+      quarterly = subsDna.map(_.quarterly).getOrElse(false),
+      annual = subsDna.map(_.annual).getOrElse(false),
       platformConnectUsage = cu,
       industryVertical = iv
     )
@@ -57,7 +57,9 @@ object a {
 object a {
   def filterPA(pa: BfCFE2ProjectedPaymentAction): Boolean =
     // nb: the ruby code doesn't explicitly filter on charge being nonEmpty, but its absence would trigger an error
-    pa.`type`.nonEmpty && wantedTypes.contains(pa.`type`.get) && pa.charge.nonEmpty
+    pa.`type`.nonEmpty && wantedTypes.contains(
+      pa.`type`.get
+    ) && pa.charge.nonEmpty
 }
 <<< function
 object A {
@@ -74,4 +76,23 @@ object A {
     (min <= len) && (len <= max)
   }
   def x = 2
+}
+<<< #2138
+rewrite.redundantBraces.methodBodies = false
+===
+object a {
+  foo(0, { x =>
+      val y = x
+      y
+    })
+}
+>>>
+object a {
+  foo(
+    0,
+    { x =>
+      val y = x
+      y
+    }
+  )
 }

@@ -21,6 +21,8 @@ def format_![T <: Tree](code: String)(f: A => B)(implicit ev: Parse[T]): String
 def format_![T <: Tree](code: String)(f: A => B)(implicit ev: Parse[T]): String
 
 <<< small multi-line functions should fit in one line
+optIn.configStyleArguments = false
+===
 def format_![T <: Tree](
     code: String)(
     f: A => B)
@@ -69,7 +71,9 @@ def format_![
     T <: Tree // Some type comment
   ](code: String, // The code!
     code2: String
-  )(implicit ev: Parse[T], // The Parser!!! Some very long comment that goes over limit
+  )(implicit ev: Parse[
+      T
+    ], // The Parser!!! Some very long comment that goes over limit
     ex: D
   ): String = 1
 
@@ -278,4 +282,14 @@ object Recorder {
 object Recorder {
   sealed abstract class Ast[A]
   final case class Record()
+}
+<<< don't fail on private[x] after class definitions (#1491)
+object Flurp {
+  class Banana(foo: String)
+  private[somepackage] object Dummy
+}
+>>>
+object Flurp {
+  class Banana(foo: String)
+  private[somepackage] object Dummy
 }

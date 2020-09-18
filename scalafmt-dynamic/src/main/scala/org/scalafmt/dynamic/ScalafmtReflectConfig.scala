@@ -1,6 +1,7 @@
 package org.scalafmt.dynamic
 
 import java.lang.reflect.Constructor
+import java.nio.file.Path
 
 import org.scalafmt.dynamic.exceptions.ReflectionException
 import org.scalafmt.dynamic.utils.ReflectUtils._
@@ -44,7 +45,7 @@ class ScalafmtReflectConfig private[dynamic] (
     matcher.invokeAs[java.lang.Boolean]("matches", filename.asParam)
   }
 
-  private val sbtDialect: Object = {
+  private def sbtDialect: Object = {
     try dialectsCls.invokeStatic("Sbt")
     catch {
       case ReflectionException(_: NoSuchMethodException) =>
@@ -52,9 +53,13 @@ class ScalafmtReflectConfig private[dynamic] (
     }
   }
 
-  def withSbtDialect: ScalafmtReflectConfig = {
-    // TODO: maybe hold loaded classes in some helper class not to reload them each time during copy?
-    val newTarget = target.invoke("withDialect", (dialectCls, sbtDialect))
+  lazy val withSbtDialect: ScalafmtReflectConfig = {
+    val newTarget =
+      try target.invoke("forSbt")
+      catch {
+        case ReflectionException(_: NoSuchMethodException) =>
+          target.invoke("withDialect", (dialectCls, sbtDialect))
+      }
     new ScalafmtReflectConfig(fmtReflect, newTarget, classLoader)
   }
 
@@ -111,6 +116,9 @@ class ScalafmtReflectConfig private[dynamic] (
         }
     }
   }
+
+  def format(code: String, file: Option[Path]): String =
+    fmtReflect.format(code, this, file)
 
   override def equals(obj: Any): Boolean = target.equals(obj)
 

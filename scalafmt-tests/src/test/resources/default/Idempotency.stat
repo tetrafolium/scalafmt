@@ -9,12 +9,7 @@ class A {
 >>>
 class A {
   def traced(in: A => Unit, out: B => Unit): Fun[A, B] =
-    (f.mapIn[A] { x =>
-        in(x); x
-      }
-      .mapOut[B] { x =>
-        out(x); x
-      })
+    (f.mapIn[A] { x => in(x); x }.mapOut[B] { x => out(x); x })
 }
 
 <<< akka 1
@@ -29,15 +24,18 @@ val bindingFuture = Http().bindAndHandleSync({
 {
   {
     {
-      val bindingFuture = Http().bindAndHandleSync({
-        case HttpRequest(_, _, headers, _, _) ⇒
-          val upgrade =
-            headers.collectFirst { case u: UpgradeToWebSocket ⇒ u }.get
-          upgrade.handleMessages(
-              Flow.fromSinkAndSource(Sink.ignore,
-                                     Source.fromPublisher(source)),
-              None)
-      }, interface = "localhost", port = 0)
+      val bindingFuture = Http().bindAndHandleSync(
+          { case HttpRequest(_, _, headers, _, _) ⇒
+            val upgrade = headers.collectFirst { case u: UpgradeToWebSocket ⇒
+              u
+            }.get
+            upgrade.handleMessages(
+                Flow.fromSinkAndSource(Sink.ignore,
+                                       Source.fromPublisher(source)),
+                None)
+          },
+          interface = "localhost",
+          port = 0)
     }
   }
 }
@@ -52,9 +50,9 @@ val bindingFuture = Http().bindAndHandleSync({
       {
         {
           {
-            RawRequestURI(new String(
-                uriBytes,
-                HttpCharsets.aaaaaaaaaa.nioCharset)) :: headers
+            RawRequestURI(
+                new String(uriBytes,
+                           HttpCharsets.aaaaaaaaaa.nioCharset)) :: headers
           }
         }
       }

@@ -1,7 +1,7 @@
 package org.scalafmt.cli
+
 import java.io.OutputStreamWriter
 
-import org.scalafmt.config.FilterMatcher
 import org.scalafmt.util.{AbsoluteFile, FileOps}
 
 trait ScalafmtRunner {
@@ -16,14 +16,10 @@ trait ScalafmtRunner {
       msg: String
   ): TermDisplay = {
     val termDisplay = new TermDisplay(
-      new OutputStreamWriter(options.info),
-      fallbackMode =
-        options.nonInteractive ||
-          TermDisplay.defaultFallbackMode
+      new OutputStreamWriter(options.common.info),
+      fallbackMode = options.nonInteractive || TermDisplay.defaultFallbackMode
     )
-    if (!options.quiet &&
-      (options.inPlace || options.testing) &&
-      inputMethods.length > 5) {
+    if (options.writeMode != WriteMode.Stdout && inputMethods.length > 5) {
       termDisplay.init()
       termDisplay.startTask(msg, options.common.workingDirectory.jfile)
       termDisplay.taskLength(msg, inputMethods.length, 0)
@@ -33,13 +29,15 @@ trait ScalafmtRunner {
 
   protected def getInputMethods(
       options: CliOptions,
-      filter: Option[FilterMatcher]
+      filter: AbsoluteFile => Boolean
   ): Seq[InputMethod] = {
     if (options.stdIn) {
       Seq(InputMethod.StdinCode(options.assumeFilename, options.common.in))
     } else {
       val projectFiles: Seq[AbsoluteFile] =
         getFilesFromCliOptions(options, filter)
+      options.common.debug
+        .print(s"Files to be formatted:\n${projectFiles.mkString("\n")}\n")
       projectFiles.map(InputMethod.FileContents.apply)
     }
   }
@@ -47,21 +45,20 @@ trait ScalafmtRunner {
   /** Returns file paths defined via options.{customFiles,customExclude} */
   private[this] def getFilesFromCliOptions(
       options: CliOptions,
-      filter: Option[FilterMatcher]
+      canFormat: AbsoluteFile => Boolean
   ): Seq[AbsoluteFile] = {
-    def canFormat(f: AbsoluteFile): Boolean =
-      filter.forall(_.matches(f))
-
     val files = options.fileFetchMode match {
       case m @ (GitFiles | RecursiveSearch) =>
         val fetchFiles: AbsoluteFile => Seq[AbsoluteFile] =
-          if (m == GitFiles) options.gitOps.lsTree(_)
-          else FileOps.listFiles(_)
+          if (m == GitFiles) options.gitOps.lsTree
+          else FileOps.listFiles
 
         options.files.flatMap {
           case d if d.jfile.isDirectory => fetchFiles(d).filter(canFormat)
           // DESNOTE(2017-05-19, pjrt): A plain, fully passed file will (try to) be
           // formatted regardless of what it is or where it is.
+          // NB: Unless respectProjectFilters is also specified.
+          case f if options.respectProjectFilters && !canFormat(f) => Seq.empty
           case f => Seq(f)
         }
 
@@ -72,8 +69,6 @@ trait ScalafmtRunner {
         options.gitOps.status.filter(canFormat)
     }
     val excludeRegexp = options.excludeFilterRegexp
-    files.filter { f =>
-      excludeRegexp.findFirstIn(f.path).isEmpty
-    }
+    files.filter { f => excludeRegexp.findFirstIn(f.path).isEmpty }
   }
 }

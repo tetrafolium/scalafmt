@@ -1,7 +1,7 @@
 package org.scalafmt.internal
 
+import scala.annotation.tailrec
 import scala.collection.mutable
-import scala.meta.Defn
 import scala.meta.tokens.Token
 
 import org.scalafmt.Error.SearchStateExploded
@@ -9,7 +9,7 @@ import org.scalafmt.config.FormatEvent.CompleteFormat
 import org.scalafmt.config.FormatEvent.Enqueue
 import org.scalafmt.config.FormatEvent.Explored
 import org.scalafmt.config.FormatEvent.VisitToken
-import org.scalafmt.internal.ExpiresOn.Right
+import org.scalafmt.config.ScalafmtConfig
 import org.scalafmt.internal.Length.Num
 import org.scalafmt.util.LoggerOps
 import org.scalafmt.util.TokenOps
@@ -18,11 +18,10 @@ import org.scalafmt.util.TreeOps
 /**
   * Implements best first search to find optimal formatting.
   */
-class BestFirstSearch(
-    val formatOps: FormatOps,
+private class BestFirstSearch private (
     range: Set[Range],
     formatWriter: FormatWriter
-) {
+)(implicit val formatOps: FormatOps) {
   import Token._
 
   import LoggerOps._
@@ -31,25 +30,23 @@ class BestFirstSearch(
   import formatOps._
   import formatOps.runner.optimizer._
 
+  implicit val stateOrdering = State.Ordering
+
   /**
     * Precomputed table of splits for each token.
     */
   val routes: Array[Seq[Split]] = {
     val router = new Router(formatOps)
     val result = Array.newBuilder[Seq[Split]]
-    tokens.foreach { t =>
-      result += router.getSplitsMemo(t)
-    }
+    tokens.foreach { t => result += router.getSplits(t) }
     result.result()
   }
   val noOptimizations = noOptimizationZones(tree)
   var explored = 0
   var deepestYet = State.start
-  var deepestYetSafe = State.start
-  var statementCount = 0
-  val best = mutable.Map.empty[Token, State]
-  var pathologicalEscapes = 0
-  val visits = mutable.Map.empty[FormatToken, Int].withDefaultValue(0)
+  val best = mutable.Map.empty[Int, State]
+  val visits = new Array[Int](tokens.length)
+  var keepSlowStates = !pruneSlowStates
 
   type StateHash = Long
 
@@ -58,49 +55,42 @@ class BestFirstSearch(
     noOptimizations.contains(token.left)
   }
 
-  def getLeftLeft(curr: State): Token = {
-    tokens(Math.max(0, curr.splits.length - 1)).left
-  }
-
   /**
     * Returns true if it's OK to skip over state.
     */
-  def shouldEnterState(curr: State): Boolean = {
-    val splitToken = tokens(curr.splits.length)
-    val insideOptimizationZone =
-      curr.policy.noDequeue || isInsideNoOptZone(splitToken)
-    def hasBestSolution = !pruneSlowStates || insideOptimizationZone || {
-      val splitToken = tokens(curr.splits.length)
+  def shouldEnterState(curr: State): Boolean =
+    keepSlowStates || curr.policy.noDequeue ||
+      isInsideNoOptZone(tokens(curr.depth)) ||
       // TODO(olafur) document why/how this optimization works.
-      val result = !best.get(splitToken.left).exists(_.alwaysBetter(curr))
-      result
-    }
-    hasBestSolution
-  }
+      !best.get(curr.depth).exists(_.alwaysBetter(curr))
 
-  def shouldRecurseOnBlock(curr: State, stop: Token) = {
-    val leftLeft = getLeftLeft(curr)
-    val leftLeftOwner = ownersMap(hash(leftLeft))
-    val splitToken = tokens(curr.splits.length)
-    val style = styleMap.at(splitToken)
-    recurseOnBlocks && isInsideNoOptZone(splitToken) &&
-    leftLeft.is[LeftBrace] && matchingParentheses(hash(leftLeft)) != stop && {
-      // Block must span at least 3 lines to be worth recursing.
-      val close = matchingParentheses(hash(leftLeft))
-      distance(leftLeft, close) > style.maxColumn * 3
-    } && extractStatementsIfAny(leftLeftOwner).nonEmpty
-  }
+  def shouldRecurseOnBlock(
+      ft: FormatToken,
+      stop: Token,
+      style: ScalafmtConfig
+  ): Option[Token] =
+    if (!recurseOnBlocks || !isInsideNoOptZone(ft)) None
+    else {
+      val left = tokens(ft, -1)
+      if (!left.left.is[LeftBrace]) None
+      else {
+        val close = matching(left.left)
+        // Block must span at least 3 lines to be worth recursing.
+        val ok = close != stop &&
+          distance(left.left, close) > style.maxColumn * 3 &&
+          extractStatementsIfAny(left.meta.leftOwner).nonEmpty
+        if (ok) Some(close) else None
+      }
+    }
 
   def provided(formatToken: FormatToken): Split = {
     // TODO(olafur) the indentation is not correctly set.
-    val split = Split(Provided(formatToken.between.map(_.syntax).mkString), 0)
+    val split = new Split(Provided(formatToken), 0) {
+      override def activateFor(splitTag: SplitTag): Split = this
+    }
     val result =
       if (formatToken.left.is[LeftBrace])
-        split.withIndent(
-          Num(2),
-          matchingParentheses(hash(formatToken.left)),
-          Right
-        )
+        split.withIndent(Num(2), matching(formatToken.left), ExpiresOn.Before)
       else split
     result
   }
@@ -109,41 +99,23 @@ class BestFirstSearch(
     state.column << 8 | state.indentation
   }
 
-  def hasReachedEof(state: State): Boolean = {
-    explored > runner.maxStateVisits || state.splits.length == tokens.length
-  }
-
   val memo = mutable.Map.empty[(Int, StateHash), State]
 
   def shortestPathMemo(start: State, stop: Token, depth: Int, maxCost: Int)(
       implicit line: sourcecode.Line
-  ): State = {
-    val key = (start.splits.length, stateColumnKey(start))
+  ): Option[State] = {
+    val key = (start.depth, stateColumnKey(start))
     val cachedState = memo.get(key)
-    cachedState match {
-      case Some(state) => state
-      case None =>
-        // Only update state if it reached stop.
-        val nextState = shortestPath(start, stop, depth, maxCost)
-        if (tokens(nextState.splits.length).left == stop) {
-          memo.update(key, nextState)
-        }
-        nextState
+    if (cachedState.nonEmpty) cachedState
+    else {
+      // Only update state if it reached stop.
+      val nextState = shortestPath(start, stop, depth, maxCost)
+      if (null == nextState) None
+      else {
+        memo.update(key, nextState)
+        Some(nextState)
+      }
     }
-  }
-
-  def untilNextStatement(state: State, maxDepth: Int): State = {
-    var curr = state
-    while (!hasReachedEof(curr) && {
-        val token = tokens(curr.splits.length).left
-        !statementStarts.contains(hash(token)) && {
-          parents(owners(token)).length <= maxDepth
-        }
-      }) {
-      val tok = tokens(curr.splits.length)
-      curr = State.next(curr, styleMap.at(tok), provided(tok), tok)
-    }
-    curr
   }
 
   /**
@@ -155,150 +127,224 @@ class BestFirstSearch(
       depth: Int = 0,
       maxCost: Int = Integer.MAX_VALUE
   ): State = {
-    val Q = new PriorityQueue[State]()
-    var result = start
-    var lastDequeue = start
+    def newGeneration = new mutable.PriorityQueue[State]()
+    var Q = newGeneration
+    var generations: List[mutable.PriorityQueue[State]] = Nil
+    def addGeneration =
+      if (Q.nonEmpty) {
+        generations = Q :: generations
+        Q = newGeneration
+      }
     Q += start
+
     // TODO(olafur) this while loop is waaaaaaaaaaaaay tooo big.
-    while (Q.nonEmpty) {
+    while (true) {
       val curr = Q.dequeue()
-      explored += 1
-      runner.eventCallback(Explored(explored, depth, Q.size))
-      if (hasReachedEof(curr) || {
-          val token = tokens(curr.splits.length)
-          // If token is empty we can take one more split before reaching stop.
-          token.left.syntax.nonEmpty && token.left.start >= stop.start
-        }) {
-        result = curr
-        Q.dequeueAll
-      } else if (shouldEnterState(curr)) {
-        val splitToken = tokens(curr.splits.length)
-        val style = styleMap.at(splitToken)
-        if (curr.splits.length > deepestYet.splits.length) {
-          deepestYet = curr
-        }
-        if (curr.policy.isSafe &&
-          curr.splits.length > deepestYetSafe.splits.length) {
-          deepestYetSafe = curr
-        }
-        runner.eventCallback(VisitToken(splitToken))
-        visits.put(splitToken, visits(splitToken) + 1)
+      if (curr.depth >= tokens.length)
+        return curr
 
-        def lastWasNewline =
-          curr.splits.lastOption.exists(_.modification.isNewline)
-        if (dequeueOnNewStatements &&
-          dequeueSpots.contains(hash(splitToken.left)) &&
-          (depth > 0 || !isInsideNoOptZone(splitToken)) &&
-          lastWasNewline) {
-          Q.dequeueAll
-          if (!isInsideNoOptZone(splitToken) && lastDequeue.policy.isSafe) {
-            lastDequeue = curr
-          }
-        } else if (emptyQueueSpots(hash(splitToken.left)) &&
-          lastWasNewline) {
-          Q.dequeueAll
-        }
+      val splitToken = tokens(curr.depth)
+      if (
+        splitToken.left.start >= stop.start &&
+        splitToken.left.start < splitToken.left.end
+      ) {
+        return curr
+      }
 
-        if (shouldRecurseOnBlock(curr, stop)) {
-          val close = matchingParentheses(hash(getLeftLeft(curr)))
-          val nextState =
-            shortestPathMemo(curr, close, depth = depth + 1, maxCost = maxCost)
-          val nextToken = tokens(nextState.splits.length)
-          if (nextToken.left == close) {
-            Q.enqueue(nextState)
-          }
-        } else if (escapeInPathologicalCases &&
-          visits(splitToken) > maxVisitsPerToken) {
-          Q.dequeueAll
-          best.clear()
-          visits.clear()
-          runner.eventCallback(CompleteFormat(explored, deepestYet, tokens))
+      if (shouldEnterState(curr)) {
+        trackState(curr, depth, Q.length)
+
+        if (explored > runner.maxStateVisits)
           throw SearchStateExploded(
             deepestYet,
-            formatWriter.mkString(deepestYet.splits),
-            tokens(deepestYet.splits.length).left
+            formatWriter.mkString(deepestYet),
+            tokens(deepestYet.depth)
+          )
+
+        implicit val style = styleMap.at(splitToken)
+
+        if (curr.split != null && curr.split.isNL) {
+          val tokenHash = hash(splitToken.left)
+          if (
+            emptyQueueSpots.contains(tokenHash) ||
+            dequeueOnNewStatements && curr.allAltAreNL &&
+            dequeueSpots.contains(tokenHash) &&
+            (depth > 0 || !isInsideNoOptZone(splitToken))
+          )
+            if (depth == 0) addGeneration
+            else Q.clear()
+        }
+
+        val blockClose = shouldRecurseOnBlock(splitToken, stop, style)
+        if (blockClose.nonEmpty)
+          shortestPathMemo(curr, blockClose.get, depth + 1, maxCost)
+            .foreach(Q.enqueue(_))
+        else if (
+          escapeInPathologicalCases &&
+          routes(curr.depth).lengthCompare(1) != 0 &&
+          visits(curr.depth) > maxVisitsPerToken
+        ) {
+          complete(deepestYet)
+          throw SearchStateExploded(
+            deepestYet,
+            formatWriter.mkString(deepestYet),
+            splitToken
           )
         } else {
+          val actualSplit = getActiveSplits(curr, maxCost)
+          val allAltAreNL = actualSplit.forall(_.isNL)
 
-          val splits: Seq[Split] =
-            if (curr.formatOff) List(provided(splitToken))
-            else if (splitToken.inside(range)) routes(curr.splits.length)
-            else List(provided(splitToken))
-
-          val actualSplit = {
-            curr.policy
-              .execute(Decision(splitToken, splits))
-              .splits
-              .filter(!_.ignoreIf)
-              .sortBy(_.cost)
-          }
           var optimalNotFound = true
           actualSplit.foreach { split =>
-            val nextState = State.next(curr, style, split, splitToken)
-            if (depth == 0 && split.modification.isNewline &&
-              !best.contains(splitToken.left)) {
-              best.update(splitToken.left, nextState)
+            val nextState = curr.next(split, allAltAreNL)
+            val updateBest = !keepSlowStates && depth == 0 &&
+              split.isNL && !best.contains(curr.depth)
+            if (updateBest) {
+              best.update(curr.depth, nextState)
             }
-            runner.eventCallback(Enqueue(split))
+            runner.event(Enqueue(split))
             split.optimalAt match {
               case Some(OptimalToken(token, killOnFail))
                   if acceptOptimalAtHints && optimalNotFound &&
                     actualSplit.length > 1 && depth < maxDepth &&
-                    nextState.splits.last.cost == 0 =>
+                    nextState.split.cost == 0 =>
                 val nextNextState =
                   shortestPath(nextState, token, depth + 1, maxCost = 0)
-                if (hasReachedEof(nextNextState) ||
-                  (nextNextState.splits.length < tokens.length && tokens(
-                    nextNextState.splits.length
-                  ).left.start >= token.start)) {
-                  optimalNotFound = false
-//                  logger.elem(split, splitToken, formatWriter.mkString(nextNextState.splits), tokens(nextNextState.splits.length))
-                  Q.enqueue(nextNextState)
-                } else if (!killOnFail &&
-                  nextState.cost - curr.cost <= maxCost) {
+                val furtherState =
+                  if (null == nextNextState) null
+                  else traverseSameLine(nextNextState, depth)
+                if (null != furtherState) {
+                  if (furtherState.column > style.maxColumn)
+                    Q.enqueue(nextNextState)
+                  else {
+                    optimalNotFound = false
+                    Q.enqueue(furtherState)
+                  }
+                } else if (
+                  !killOnFail &&
+                  nextState.cost - curr.cost <= maxCost
+                ) {
                   // TODO(olafur) DRY. This solution can still be optimal.
-//                  logger.elem(split, splitToken)
                   Q.enqueue(nextState)
-                } // else kill branch
+                } else { // else kill branch
+                  if (updateBest) best.remove(curr.depth)
+                }
               case _
                   if optimalNotFound &&
                     nextState.cost - curr.cost <= maxCost =>
                 Q.enqueue(nextState)
               case _ => // Kill branch.
+                if (updateBest) best.remove(curr.depth)
             }
           }
         }
       }
+
+      if (Q.isEmpty) {
+        if (generations.isEmpty)
+          return null
+
+        Q = generations.head
+        generations = generations.tail
+      }
     }
-    result
+
+    // unreachable
+    null
   }
 
+  private def getActiveSplits(state: State, maxCost: Int): Seq[Split] = {
+    val ft = tokens(state.depth)
+    val useProvided = state.formatOff || !ft.inside(range)
+    val splits = if (useProvided) Seq(provided(ft)) else routes(state.depth)
+
+    state.policy
+      .execute(Decision(ft, splits))
+      .splits
+      .filter(x => x.isActive && x.cost <= maxCost)
+      .sortBy(_.cost)
+  }
+
+  private def trackState(state: State, depth: Int, queueSize: Int): Unit = {
+    if (state.depth > deepestYet.depth) deepestYet = state
+    runner.event(VisitToken(tokens(state.depth)))
+    visits(state.depth) += 1
+    explored += 1
+    runner.event(Explored(explored, depth, queueSize))
+  }
+
+  /**
+    * Follow states having single active non-newline split
+    */
+  @tailrec
+  private def traverseSameLine(state: State, depth: Int): State =
+    if (state.depth >= tokens.length) state
+    else {
+      trackState(state, depth, 0)
+      val activeSplits = getActiveSplits(state, Int.MaxValue)
+
+      if (activeSplits.lengthCompare(1) != 0)
+        if (activeSplits.isEmpty) null else state // dead end if empty
+      else {
+        val split = activeSplits.head
+        if (split.isNL) state
+        else {
+          runner.event(Enqueue(split))
+          implicit val style = styleMap.at(tokens(state.depth))
+          val nextState = state.next(split, false)
+          traverseSameLine(nextState, depth)
+        }
+      }
+    }
+
+  private def complete(state: State): Unit =
+    runner.event(CompleteFormat(explored, state, visits))
+
   def getBestPath: SearchResult = {
-    val state = shortestPath(State.start, tree.tokens.last)
-    if (state.splits.length == tokens.length) {
-      runner.eventCallback(CompleteFormat(explored, state, tokens))
-      SearchResult(state.splits, reachedEOF = true)
+    val state = {
+      def run = shortestPath(State.start, tree.tokens.last)
+      val state = run
+      if (null != state || keepSlowStates) state
+      else {
+        best.clear()
+        keepSlowStates = true
+        run
+      }
+    }
+    if (null != state) {
+      complete(state)
+      SearchResult(state, reachedEOF = true)
     } else {
-      val nextSplits = routes(deepestYet.splits.length)
-      val tok = tokens(deepestYet.splits.length)
+      val nextSplits = routes(deepestYet.depth)
+      val tok = tokens(deepestYet.depth)
       val splitsAfterPolicy =
         deepestYet.policy.execute(Decision(tok, nextSplits))
       val msg = s"""UNABLE TO FORMAT,
-                   |tok=$tok
-                   |state.length=${state.splits.length}
-                   |toks.length=${tokens.length}
-                   |deepestYet.length=${deepestYet.splits.length}
-                   |policies=${deepestYet.policy.policies}
-                   |nextSplits=$nextSplits
-                   |splitsAfterPolicy=$splitsAfterPolicy""".stripMargin
+        |tok=$tok
+        |toks.length=${tokens.length}
+        |deepestYet.length=${deepestYet.depth}
+        |policies=${deepestYet.policy.policies}
+        |nextSplits=$nextSplits
+        |splitsAfterPolicy=$splitsAfterPolicy""".stripMargin
       if (runner.debug) {
         logger.debug(s"""Failed to format
-                        |$msg""".stripMargin)
+          |$msg""".stripMargin)
       }
-      runner.eventCallback(CompleteFormat(explored, deepestYet, tokens))
-      SearchResult(deepestYet.splits, reachedEOF = false)
+      complete(deepestYet)
+      SearchResult(deepestYet, reachedEOF = false)
     }
   }
 }
 
-case class SearchResult(splits: Vector[Split], reachedEOF: Boolean)
+case class SearchResult(state: State, reachedEOF: Boolean)
+
+object BestFirstSearch {
+
+  def apply(
+      formatOps: FormatOps,
+      range: Set[Range],
+      formatWriter: FormatWriter
+  ): SearchResult =
+    new BestFirstSearch(range, formatWriter)(formatOps).getBestPath
+
+}

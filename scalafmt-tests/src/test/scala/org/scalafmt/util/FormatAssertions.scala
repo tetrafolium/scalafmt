@@ -1,19 +1,15 @@
 package org.scalafmt.util
 
-import scala.meta.Dialect
-import scala.meta.Tree
-import scala.meta.parsers.Parse
-import scala.meta.parsers.ParseException
-import scala.meta.testkit.StructurallyEqual
-
 import java.io.ByteArrayInputStream
 
-import org.scalafmt.Error.FormatterChangedAST
-import org.scalafmt.Error.FormatterOutputDoesNotParse
+import org.scalafmt.Error.{FormatterChangedAST, FormatterOutputDoesNotParse}
 import org.scalameta.logger
-import org.scalatest.FunSuiteLike
 
-trait FormatAssertions extends FunSuiteLike with DiffAssertions {
+import scala.meta.parsers.{Parse, ParseException}
+import scala.meta.testkit.StructurallyEqual
+import scala.meta.{Dialect, Tree}
+
+trait FormatAssertions extends DiffAssertions {
 
   def assertFormatPreservesAst[T <: Tree](
       original: String,
@@ -58,13 +54,11 @@ trait FormatAssertions extends FunSuiteLike with DiffAssertions {
     */
   def diffAsts(original: String, obtained: String): String = {
 //    compareContents(formatAst(original), formatAst(obtained))
-    // Predef.augmentString = work around scala/bug#11125 on JDK 11
-    augmentString(
-      compareContents(
-        original.replace("(", "\n("),
-        obtained.replace("(", "\n(")
-      )
-    ).lines.mkString("\n")
+
+    compareContents(
+      original.replace("(", "\n("),
+      obtained.replace("(", "\n(")
+    ).linesIterator.mkString("\n")
   }
 
   // TODO(olafur) move this to scala.meta?
@@ -72,14 +66,13 @@ trait FormatAssertions extends FunSuiteLike with DiffAssertions {
   def parseException2Message(e: ParseException, obtained: String): String = {
     val range = 3
     val i = e.pos.startLine
-    // Predef.augmentString = work around scala/bug#11125 on JDK 11
-    val lines = augmentString(obtained).lines.toVector
+    val lines = obtained.linesIterator.toVector
     val arrow = (" " * (e.pos.startColumn - 2)) + "^"
     s"""${lines.slice(i - range, i + 1).mkString("\n")}
-       |$arrow
-       |${e.getMessage}
-       |${lines.slice(i + 1, i + range).mkString("\n")}
-       |$obtained
-       |""".stripMargin
+      |$arrow
+      |${e.getMessage}
+      |${lines.slice(i + 1, i + range).mkString("\n")}
+      |$obtained
+      |""".stripMargin
   }
 }

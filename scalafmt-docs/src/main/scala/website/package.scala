@@ -5,15 +5,13 @@ import java.nio.file.StandardOpenOption
 import org.scalafmt.Scalafmt
 import org.scalafmt.config.ScalafmtRunner
 import org.scalafmt.config.ScalafmtConfig
-import org.scalafmt.config.ScalafmtConfig.default40
 import org.scalafmt.config.Config
 
 package object website {
   def replaceMargin(s: String): String = {
     val buf = new StringBuilder
 
-    // Predef.augmentString = work around scala/bug#11125 on JDK 11
-    for (line <- augmentString(s).lines) {
+    for (line <- s.linesIterator) {
       val len = line.length
       var index = 0
       while (index < len && line.charAt(index) <= ' ') {

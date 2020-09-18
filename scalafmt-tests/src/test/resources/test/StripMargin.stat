@@ -1,8 +1,8 @@
 assumeStandardLibraryStripMargin = true
 <<< Align | margin 1
 val x = """Formatter changed AST
-          |=====================
-          |$diff
+      |=====================
+      |$diff
         """
         .stripMargin
 >>>
@@ -10,6 +10,139 @@ val x = """Formatter changed AST
           |=====================
           |$diff
         """.stripMargin
+<<< No align | margin 1
+align.stripMargin = false
+===
+val x = """Formatter changed AST
+      |=====================
+      |$diff
+        """
+        .stripMargin
+>>>
+val x = """Formatter changed AST
+  |=====================
+  |$diff
+        """.stripMargin
+<<< Align | margin 1, different char
+val x = """Formatter changed AST
+      |=====================
+      |$diff
+      ?=====================
+      ?$diff
+        """
+        .stripMargin('?')
+>>>
+val x = """Formatter changed AST
+      |=====================
+      |$diff
+          ?=====================
+          ?$diff
+        """
+  .stripMargin('?')
+<<< No align | margin 1, different char
+align.stripMargin = false
+===
+val x = """Formatter changed AST
+      |=====================
+      |$diff
+      ?=====================
+      ?$diff
+        """
+        .stripMargin('?')
+>>>
+val x = """Formatter changed AST
+      |=====================
+      |$diff
+  ?=====================
+  ?$diff
+        """
+  .stripMargin('?')
+<<< No rewrite | margin 1, different char
+assumeStandardLibraryStripMargin = false
+===
+val x = """Formatter changed AST
+      |=====================
+      |$diff
+      ?=====================
+      ?$diff
+        """
+        .stripMargin('?')
+>>>
+val x = """Formatter changed AST
+      |=====================
+      |$diff
+      ?=====================
+      ?$diff
+        """
+  .stripMargin('?')
+<<< Align | margin 1 | interpolate, different char
+val x = s"""Formatter changed AST
+      |=====================
+      |$diff
+      ?=====================
+      ?$diff
+        """
+        .stripMargin('?')
+>>>
+val x = s"""Formatter changed AST
+      |=====================
+      |$diff
+           ?=====================
+           ?$diff
+        """
+  .stripMargin('?')
+<<< Align | margin 1 | interpolate, different char, starts string
+val x = s"""?Formatter changed AST
+      |=====================
+      |$diff
+      ?=====================
+      ?$diff
+        """
+        .stripMargin('?')
+>>>
+val x = s"""?Formatter changed AST
+      |=====================
+      |$diff
+            ?=====================
+            ?$diff
+        """
+  .stripMargin('?')
+<<< No align | margin 1 | interpolate, different char
+align.stripMargin = false
+===
+val x = f"""Formatter changed AST
+      |=====================
+      |$diff
+      ?=====================
+      ?$diff
+        """
+        .stripMargin('?')
+>>>
+val x = f"""Formatter changed AST
+      |=====================
+      |$diff
+  ?=====================
+  ?$diff
+        """
+  .stripMargin('?')
+<<< No rewrite | margin 1 | interpolate, different char
+assumeStandardLibraryStripMargin = false
+===
+val x = f"""Formatter changed AST
+      |=====================
+      |$diff
+      ?=====================
+      ?$diff
+        """
+        .stripMargin('?')
+>>>
+val x = f"""Formatter changed AST
+      |=====================
+      |$diff
+      ?=====================
+      ?$diff
+        """
+  .stripMargin('?')
 <<< Align | margin 2
 {
   val x = 1
@@ -39,3 +172,139 @@ val x =
 >>>
 """|first
    |second""".stripMargin
+<<< pipe char on first line #324, no align
+align.stripMargin = false
+===
+"""|first
+  |second""".stripMargin
+>>>
+"""|first
+  |second""".stripMargin
+<<< no align, complex interpolation
+align.stripMargin = false
+===
+object a {
+     s"""|
+        |  update targeting_segments
+        |  set status = '$status',
+        |${lastBuiltOpt.fold("")(dt => s"  last_built = '${formatDate(dt)}',")}
+        |${sizeCondition.fold("")(cond => s"  customers = $cond,")}
+        |  updated_at = now()
+        |  where id in (${audienceIds.mkString(",")})""".stripMargin
+}
+>>>
+object a {
+  s"""|
+    |  update targeting_segments
+    |  set status = '$status',
+    |${lastBuiltOpt.fold("")(dt => s"  last_built = '${formatDate(dt)}',")}
+    |${sizeCondition.fold("")(cond => s"  customers = $cond,")}
+    |  updated_at = now()
+    |  where id in (${audienceIds.mkString(",")})""".stripMargin
+}
+<<< align, complex interpolation
+align.stripMargin = true
+===
+object a {
+     s"""
+        |  update targeting_segments
+        |  set status = '$status',
+        |${lastBuiltOpt.fold("")(dt => s"  last_built = '${formatDate(dt)}',")}
+        |${sizeCondition.fold("")(cond => s"  customers = $cond,")}
+        |  updated_at = now()
+        |  where id in (${audienceIds.mkString(",")})""".stripMargin
+}
+>>>
+object a {
+  s"""
+     |  update targeting_segments
+     |  set status = '$status',
+     |${lastBuiltOpt.fold("")(dt => s"  last_built = '${formatDate(dt)}',")}
+     |${sizeCondition.fold("")(cond => s"  customers = $cond,")}
+     |  updated_at = now()
+     |  where id in (${audienceIds.mkString(",")})""".stripMargin
+}
+<<< align, pipe character: RIGHT PARENTHESIS
+align.stripMargin = true
+===
+object a {
+     s"""
+        )  update targeting_segments
+        )  set status = '$status',
+        )${lastBuiltOpt.fold("")(dt => s"  last_built = '${formatDate(dt)}',")}
+        )${sizeCondition.fold("")(cond => s"  customers = $cond,")}
+        )  updated_at = now()
+        )  where id in (${audienceIds.mkString(",")})""".stripMargin(')')
+}
+>>>
+object a {
+  s"""
+     )  update targeting_segments
+     )  set status = '$status',
+     )${lastBuiltOpt.fold("")(dt => s"  last_built = '${formatDate(dt)}',")}
+     )${sizeCondition.fold("")(cond => s"  customers = $cond,")}
+     )  updated_at = now()
+     )  where id in (${audienceIds.mkString(",")})""".stripMargin(')')
+}
+<<< align, pipe character: DOLLAR SIGN
+align.stripMargin = true
+===
+object a {
+     s"""
+        $$  update targeting_segments
+        $$  set status = '$status',
+        $$${lastBuiltOpt.fold("")(dt => s"  last_built = '${formatDate(dt)}',")}
+        $$${sizeCondition.fold("")(cond => s"  customers = $cond,")}
+        $$  updated_at = now()
+        $$  where id in (${audienceIds.mkString(",")})""".stripMargin('$')
+}
+>>>
+object a {
+  s"""
+     $$  update targeting_segments
+     $$  set status = '$status',
+     $$${lastBuiltOpt.fold("")(dt => s"  last_built = '${formatDate(dt)}',")}
+     $$${sizeCondition.fold("")(cond => s"  customers = $cond,")}
+     $$  updated_at = now()
+     $$  where id in (${audienceIds.mkString(",")})""".stripMargin('$')
+}
+<<< align, pipe character: REVERSE SOLIDUS a.k.a. backslash
+align.stripMargin = true
+===
+object a {
+     s"""
+        \  update targeting_segments
+        \  set status = '$status',
+        \${lastBuiltOpt.fold("")(dt => s"  last_built = '${formatDate(dt)}',")}
+        \${sizeCondition.fold("")(cond => s"  customers = $cond,")}
+        \  updated_at = now()
+        \  where id in (${audienceIds.mkString(",")})""".stripMargin('\\')
+}
+>>>
+object a {
+  s"""
+     \  update targeting_segments
+     \  set status = '$status',
+     \${lastBuiltOpt.fold("")(dt => s"  last_built = '${formatDate(dt)}',")}
+     \${sizeCondition.fold("")(cond => s"  customers = $cond,")}
+     \  updated_at = now()
+     \  where id in (${audienceIds.mkString(",")})""".stripMargin('\\')
+}
+<<< #2025 1
+final class MyClass {
+    println(s"${1}".stripMargin)
+}
+>>>
+final class MyClass {
+  println(s"${1}".stripMargin)
+}
+<<< #2025 2
+final class MyClass {
+    println(s"""${1}
+    """.stripMargin)
+}
+>>>
+final class MyClass {
+  println(s"""${1}
+    """.stripMargin)
+}

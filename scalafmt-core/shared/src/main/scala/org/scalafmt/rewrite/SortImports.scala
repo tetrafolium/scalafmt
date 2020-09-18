@@ -1,7 +1,5 @@
 package org.scalafmt.rewrite
 
-import scala.meta.Importee
-import scala.meta.Tree
 import scala.meta._
 
 /**
@@ -15,66 +13,71 @@ import scala.meta._
   *
   * import a.{b, c}
   */
-sealed trait SortImports extends Rewrite {
+sealed abstract class SortImports(implicit ctx: RewriteCtx)
+    extends RewriteSession {
+
+  import ctx.dialect
 
   /**
     * The sorting scheme to use when sorting the imports
     */
-  def sorted(str: Seq[String]): Seq[String]
+  protected def sorted(str: Seq[String]): IndexedSeq[String]
 
-  override def rewrite(code: Tree, ctx: RewriteCtx): Seq[Patch] = {
-    import ctx.dialect
-    code.collect {
+  override def rewrite(tree: Tree): Unit =
+    tree match {
       case Import(imports) =>
-        imports.flatMap { `import` =>
-          if (`import`.importees.exists(!_.is[Importee.Name])) {
+        val builder = Seq.newBuilder[TokenPatch]
+        imports.foreach { `import` =>
+          val importees = `import`.importees
+          if (!importees.exists(!_.is[Importee.Name])) {
             // Do nothing if an importee has for example rename
             // import a.{d, b => c}
             // I think we are safe to sort these, just want to convince myself
             // it's 100% safe first.
-            Nil
-          } else {
-            val sortedImporteesByIndex: Map[Int, String] =
-              sorted(`import`.importees.map(_.tokens.mkString)).zipWithIndex
-                .map(_.swap)
-                .toMap
-            `import`.importees.zipWithIndex.collect {
-              case (importee, i) =>
-                TokenPatch.AddRight(
-                  importee.tokens.head,
-                  sortedImporteesByIndex(i)
-                )
+            val sortedImportees = sorted(importees.map(_.tokens.mkString))
+            var i = 0
+            importees.foreach { importee =>
+              builder +=
+                TokenPatch.AddRight(importee.tokens.head, sortedImportees(i))
+              i += 1
             }
           }
         }
-    }.flatten
-  }
+        ctx.addPatchSet(builder.result(): _*)
+
+      case _ =>
+    }
 }
 
 /**
   * Sort imports with symbols at the beginning, followed by lowercase and
   * finally uppercase
   */
-case object SortImports extends SortImports {
+object SortImports extends Rewrite {
 
   // sort contributed by @djspiewak: https://gist.github.com/djspiewak/127776c2b6a9d6cd3c21a228afd4580f
   private val LCase = """([a-z].*)""".r
   private val UCase = """([A-Z].*)""".r
   private val Other = """(.+)""".r
 
-  override def sorted(strs: Seq[String]): Seq[String] = {
-    // we really want partition, but there is no ternary version of it
-    val (syms, lcs, ucs) = strs.foldLeft(
-      (Vector.empty[String], Vector.empty[String], Vector.empty[String])
-    ) {
-      case ((syms, lcs, ucs), str) =>
-        str match {
-          case LCase(s) => (syms, lcs :+ s, ucs)
-          case UCase(s) => (syms, lcs, ucs :+ s)
-          case Other(s) => (syms :+ s, lcs, ucs)
-        }
+  override def create(implicit ctx: RewriteCtx): RewriteSession =
+    new Impl
+
+  private class Impl(implicit ctx: RewriteCtx) extends SortImports {
+    override def sorted(strs: Seq[String]): IndexedSeq[String] = {
+      // we really want partition, but there is no ternary version of it
+      val (syms, lcs, ucs) = strs.foldLeft(
+        (Vector.empty[String], Vector.empty[String], Vector.empty[String])
+      ) {
+        case ((syms, lcs, ucs), str) =>
+          str match {
+            case LCase(s) => (syms, lcs :+ s, ucs)
+            case UCase(s) => (syms, lcs, ucs :+ s)
+            case Other(s) => (syms :+ s, lcs, ucs)
+          }
+      }
+      syms.sorted ++ lcs.sorted ++ ucs.sorted
     }
-    syms.sorted ++ lcs.sorted ++ ucs.sorted
   }
 }
 
@@ -83,7 +86,13 @@ case object SortImports extends SortImports {
   *
   * See: http://support.ecisolutions.com/doc-ddms/help/reportsmenu/ascii_sort_order_chart.htm
   */
-case object AsciiSortImports extends SortImports {
+object AsciiSortImports extends Rewrite {
 
-  override def sorted(strs: Seq[String]): Seq[String] = strs.sorted
+  override def create(implicit ctx: RewriteCtx): RewriteSession =
+    new Impl
+
+  private class Impl(implicit ctx: RewriteCtx) extends SortImports {
+    override def sorted(strs: Seq[String]): IndexedSeq[String] =
+      strs.sorted.toIndexedSeq
+  }
 }

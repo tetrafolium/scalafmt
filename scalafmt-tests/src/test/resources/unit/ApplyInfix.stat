@@ -18,7 +18,8 @@ js.Return(!(!({
 <<< force space on infix application arguments
 opt[(Int, Int)]("range") hidden() action {}
 >>>
-opt[(Int, Int)]("range") hidden () action {}
+opt[(Int, Int)](
+    "range") hidden () action {}
 <<< string concatenation
 logger.warning("foooooooooooooo" +
 "baaaaaaaaaaaaaar")
@@ -103,10 +104,9 @@ ctx.replace(
 )
 >>>
 ctx.replace(
-    additionalImports =
-      "" ::
-        (if (true) x
-         else y)
+    additionalImports = "" ::
+      (if (true) x
+       else y)
 )
 <<< #990 if/else indent 2
 ctx.replace(
@@ -118,11 +118,10 @@ ctx.replace(
 )
 >>>
 ctx.replace(
-    additionalImports =
-      "" ::
-        foo.map { x =>
-          x + 1
-        }
+    additionalImports = "" ::
+      foo.map { x =>
+        x + 1
+      }
 )
 <<< right assoc
 x ::
@@ -171,8 +170,8 @@ case x :: x
 >>>
 1 match {
   case x :: x
-        :: y :: y
-        :: z :: z =>
+      :: y :: y
+      :: z :: z =>
 }
 <<< type.apply start line
 type x = (X

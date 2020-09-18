@@ -8,9 +8,8 @@ List(Split(Space, 0).withPolicy(SingleLineBlock(close)),
 >>>
 List(Split(Space, 0).withPolicy(SingleLineBlock(close)),
      Split(nl, 1)
-       .withPolicy({
-         case Decision(t @ FormatToken(_, `close`, _), s) =>
-           Decision(t, List(Split(Newline, 0)))
+       .withPolicy({ case Decision(t @ FormatToken(_, `close`, _), s) =>
+         Decision(t, List(Split(Newline, 0)))
        })
        .withIndent(2, close, Right))
 <<< Massive 2
@@ -29,10 +28,34 @@ List(Split(Space,
            0,
            policy = SingleLineBlock(close),
            ignoreIf = blockSize > style.maxColumn),
-     Split(nl, 1, policy = {
-       case Decision(t @ FormatToken(_, `close`, _), s) =>
-         Decision(t, List(Split(Newline, 0)))
-     }))
+     Split(nl,
+           1,
+           policy = { case Decision(t @ FormatToken(_, `close`, _), s) =>
+             Decision(t, List(Split(Newline, 0)))
+           }))
+<<< Massive 2 with spaces inside parens
+spaces.inParentheses = true
+===
+ List(Split(Space,
+            0,
+            policy = SingleLineBlock(close),
+            ignoreIf = blockSize > style.maxColumn),
+      Split(nl,
+            1,
+            policy = {
+            case Decision(t@FormatToken(_, `close`, _), s) =>
+            Decision(t, List(Split(Newline, 0)))
+            }))
+>>>
+List( Split( Space,
+             0,
+             policy = SingleLineBlock( close ),
+             ignoreIf = blockSize > style.maxColumn ),
+      Split( nl,
+             1,
+             policy = { case Decision( t @ FormatToken( _, `close`, _ ), s ) =>
+               Decision( t, List( Split( Newline, 0 ) ) )
+             } ) )
 <<< Massive (good API) 3
 Split(Space, 0).withPolicy {
     // Following case:
@@ -70,17 +93,19 @@ Split(Space, 0, policy = {
       Decision(t, splits.map(_.withModification(Newline2x)))
 })
 >>>
-Split(Space, 0, policy = {
-  // Following case:
-  // package foo // this is cool
-  //
-  // object a
-  case Decision(t @ FormatToken(`lastRef`, _: Comment, between), splits)
-      if !between.exists(_.isInstanceOf[`\n`]) =>
-    Decision(t, splits.map(_.withModification(Space)))
-  case Decision(t @ FormatToken(`lastRef`, _, _), splits) =>
-    Decision(t, splits.map(_.withModification(Newline2x)))
-})
+Split(Space,
+      0,
+      policy = {
+        // Following case:
+        // package foo // this is cool
+        //
+        // object a
+        case Decision(t @ FormatToken(`lastRef`, _: Comment, between), splits)
+            if !between.exists(_.isInstanceOf[`\n`]) =>
+          Decision(t, splits.map(_.withModification(Space)))
+        case Decision(t @ FormatToken(`lastRef`, _, _), splits) =>
+          Decision(t, splits.map(_.withModification(Newline2x)))
+      })
 <<< Looong
 Seq(
   Split(modification, 0, policy = singleLine)
@@ -134,10 +159,10 @@ Seq(
     // Either everything fits in one line or break on =>
     Split(Space, 0).withPolicy(SingleLineBlock(lastToken)),
     Split(Space, 1)
-      .withPolicy(Policy({
-        case Decision(t @ FormatToken(`arrow`, _, _), s) =>
-          Decision(t, s.filter(_.modification.isNewline))
-      }, expire = lastToken.end))
+      .withPolicy(Policy({ case Decision(t @ FormatToken(`arrow`, _, _), s) =>
+                           Decision(t, s.filter(_.modification.isNewline))
+                         },
+                         expire = lastToken.end))
       .withIndent(2, lastToken, Left) // case body indented by 2.
       .withIndent(2, arrow, Left) // cond body indented by 4.
 )
@@ -165,11 +190,11 @@ val ret = new mutable.MapBuilder[TokenHash, Tree, Map[TokenHash, Tree]](
       {
         Seq(
             Split(
-                  // This split needs to have an optimalAt field.
-                  Space,
-                  0,
-                  ignoreIf = !spaceCouldBeOk,
-                  optimalAt = Some(expire_______________a))
+                // This split needs to have an optimalAt field.
+                Space,
+                0,
+                ignoreIf = !spaceCouldBeOk,
+                optimalAt = Some(expire_______________a))
               .withPolicy(SingleLineBlockAAAA(expire))
         )
       }
@@ -204,14 +229,15 @@ val result = new scala.collection.mutable.SetBuilder[Token, Set[Token]](Set.empt
     })
 >>>
 writeRead(
-          // Use list because Array has a shitty toString
-          { (b: List[Byte], os) =>
-            os.writePosVarInt(b.size); os.writeBytes(b.toArray)
-          }, { is =>
-            val bytes = new Array[Byte](is.readPosVarInt)
-            is.readFully(bytes)
-            bytes.toList
-          })
+    // Use list because Array has a shitty toString
+    { (b: List[Byte], os) =>
+      os.writePosVarInt(b.size); os.writeBytes(b.toArray)
+    },
+    { is =>
+      val bytes = new Array[Byte](is.readPosVarInt)
+      is.readFully(bytes)
+      bytes.toList
+    })
 <<< resolution copier
 class ResolutionCopier(x: Int) {
 
@@ -311,9 +337,10 @@ implicit class IterableW[+A](it: JSIterable[A]) {
             data => data)
 >>>
 foo.fold(err => {
-  logger.warn(s"Malformed request: $err\n${req.body}")
-  BadRequest(jsonError(JsError toJson err)).fuccess
-}, data => data)
+           logger.warn(s"Malformed request: $err\n${req.body}")
+           BadRequest(jsonError(JsError toJson err)).fuccess
+         },
+         data => data)
 <<< quirk in 0.2.4-RC1, #233
 {{{{{
           compileInputs in (It, compile) <<= (compileInputs in (It, compile)) dependsOn
@@ -344,13 +371,15 @@ foo.fold(err => {
 >>>
 Seq(
     Split(Space, 0),
-    Split(Newline, 1).withPolicy(Policy({
-      // Force template to be multiline.
-      case d @ Decision(FormatToken(open: `{`, right, _), splits)
-          if !right.isInstanceOf[`}`] && // corner case, body is {}
-            childOf(template, owners(open)) =>
-        d.copy(splits = splits.filter(_.modification.isNewline))
-    }, expire.end))
+    Split(Newline, 1).withPolicy(
+        Policy({
+                 // Force template to be multiline.
+                 case d @ Decision(FormatToken(open: `{`, right, _), splits)
+                     if !right.isInstanceOf[`}`] && // corner case, body is {}
+                       childOf(template, owners(open)) =>
+                   d.copy(splits = splits.filter(_.modification.isNewline))
+               },
+               expire.end))
 )
 <<< #310
 CreditCard(customerId = customerId,
@@ -515,6 +544,8 @@ def startSharding(system: ActorSystem,
     { case (name: String, _) => (name.hashCode % shardCount).toString }
 )
 <<< spray shit
+newlines.avoidForSimpleOverflow = [punct]
+===
 {{{
       get {
         respondWithMediaType(MediaTypes.`application/json`) {
@@ -552,19 +583,19 @@ def startSharding(system: ActorSystem,
                 "plugins" -> Map(
                     "outputblockers" -> pluginContext.outputBlockers.map {
                       case (n, p) =>
-                        n -> Map("name" -> p.pluginName,
-                                 "description" -> p.pluginDescription,
-                                 "class" -> p.getClass.getName,
-                                 "params" -> pluginContext.pluginParams(
-                                     p.pluginName))
+                        n -> Map(
+                            "name" -> p.pluginName,
+                            "description" -> p.pluginDescription,
+                            "class" -> p.getClass.getName,
+                            "params" -> pluginContext.pluginParams(p.pluginName))
                     },
                     "outputsniffers" -> pluginContext.outputSniffers.map {
                       case (n, p) =>
-                        n -> Map("name" -> p.pluginName,
-                                 "description" -> p.pluginDescription,
-                                 "class" -> p.getClass.getName,
-                                 "params" -> pluginContext.pluginParams(
-                                     p.pluginName))
+                        n -> Map(
+                            "name" -> p.pluginName,
+                            "description" -> p.pluginDescription,
+                            "class" -> p.getClass.getName,
+                            "params" -> pluginContext.pluginParams(p.pluginName))
                     }
                 ))
           }
@@ -572,4 +603,841 @@ def startSharding(system: ActorSystem,
       }
     }
   }
+}
+<<< nested apply with assign
+newlines.avoidForSimpleOverflow = [punct]
+===
+opt[String]("json-extractor") action { (x, c) =>
+    c.copy(         common =
+            c.common.copy(
+            jsonExtractor = JsonExtractorOption.withName(x)))
+}
+>>>
+opt[String]("json-extractor") action { (x, c) =>
+  c.copy(common = c.common.copy(jsonExtractor = JsonExtractorOption.withName(x)))
+}
+<<< nested apply with assign 2
+ {
+       val config =
+         WSClientConfig(          ssl =
+            SSLConfig(loose = SSLLooseConfig(allowLegacyHelloMessages = None)))
+        val game = Game(              castleLastMoveTime =
+                CastleLastMoveTime.init.copy(castles = game.board.history.castles),
+                    daysPerTurn = daysPerTurn
+                    )
+                    }
+>>>
+{
+  val config =
+    WSClientConfig(ssl =
+      SSLConfig(loose = SSLLooseConfig(allowLegacyHelloMessages = None)))
+  val game = Game(
+      castleLastMoveTime =
+        CastleLastMoveTime.init.copy(castles = game.board.history.castles),
+      daysPerTurn = daysPerTurn)
+}
+<<< #1604 1: apply with then without assign, and attached comments
+{
+       val config =         WSClientConfig(          ssl =
+SSLConfig(SSLLooseConfig(allowLegacyHelloMessages = None)/*comment 123 comment 234*/)) //comment 345 comment 456
+}
+>>>
+{
+  val config = WSClientConfig(ssl =
+    SSLConfig(
+        SSLLooseConfig(allowLegacyHelloMessages =
+          None) /*comment 123 comment 234*/
+    )
+  ) //comment 345 comment 456
+}
+<<< #1604 2: apply without then with assign, and attached comments
+{
+       val config =         WSClientConfig(
+SSLConfig(loose = SSLLooseConfig(allowLegacyHelloMessages = None)/*comment 123 comment 234*/)) //comment 345 comment 456
+}
+>>>
+{
+  val config = WSClientConfig(
+      SSLConfig(loose =
+        SSLLooseConfig(allowLegacyHelloMessages =
+          None) /*comment 123 comment 234*/
+      )
+  ) //comment 345 comment 456
+}
+<<< #1604 3: apply with assign and attached comments
+{
+       val config =         WSClientConfig(ssl =
+SSLConfig(loose = SSLLooseConfig(allowLegacyHelloMessages = None)/*comment 123 comment 234*/)) //comment 345 comment 456
+}
+>>>
+{
+  val config = WSClientConfig(ssl = SSLConfig(loose =
+    SSLLooseConfig(allowLegacyHelloMessages = None) /*comment 123 comment 234*/
+  )) //comment 345 comment 456
+}
+<<< #1604 4: apply without assign and attached comments
+{
+       val config =         WSClientConfig(
+SSLConfig(SSLLooseConfig(None)/*comment 123 comment 234*/)) //comment 345 comment 456
+}
+>>>
+{
+  val config = WSClientConfig(
+      SSLConfig(SSLLooseConfig(None) /*comment 123 comment 234*/ )
+  ) //comment 345 comment 456
+}
+<<< comment in first arg, no newline
+maxColumn = 28
+===
+val a = b(  /* comment */ arg1,
+   arg2)
+>>>
+val a = b(
+    /* comment */ arg1,
+    arg2)
+<<< comment in first arg, newline
+maxColumn = 28
+===
+val a = b(
+  /* comment */ arg1,    arg2)
+>>>
+val a = b(
+    /* comment */ arg1,
+    arg2)
+<<< init with multiple curried parameters and comment, long
+align.preset = none
+===
+val a = new b(/*c1*/c => d)(/*c2*/e => f, g => h)
+>>>
+val a = new b( /*c1*/ c => d)( /*c2*/ e => f, g => h)
+<<< init with multiple curried parameters and comment, short
+align.preset = none
+maxColumn = 30
+===
+val a = new b(/*c1*/c => dddddddd)(/*c2*/e => f, g => h)
+>>>
+val a = new b( /*c1*/ c =>
+  dddddddd)(
+    /*c2*/ e => f,
+    g => h)
+<<< def with multiple curried single parameters
+newlines.avoidForSimpleOverflow = [punct]
+===
+ object ThreadPoolConfigDispatcherBuilder {
+  def conf_?[T](opt: Option[T])(
+      fun: (
+          T) => ThreadPoolConfigDispatcherBuilder => ThreadPoolConfigDispatcherBuilder)
+       : Option[
+         (ThreadPoolConfigDispatcherBuilder) => ThreadPoolConfigDispatcherBuilder] =
+     opt map fun
+ }
+>>>
+object ThreadPoolConfigDispatcherBuilder {
+  def conf_?[T](opt: Option[T])(
+      fun: (T) => ThreadPoolConfigDispatcherBuilder => ThreadPoolConfigDispatcherBuilder)
+      : Option[(ThreadPoolConfigDispatcherBuilder) => ThreadPoolConfigDispatcherBuilder] =
+    opt map fun
+}
+<<< implicit with single argument
+align.preset = none
+===
+  def apply(throughput: Int)(implicit context: ExecutionContext)
+      : SerializedSuspendableExecutionContext =
+     new SerializedSuspendableExecutionContext(throughput)
+>>>
+def apply(throughput: Int)(implicit
+    context: ExecutionContext): SerializedSuspendableExecutionContext =
+  new SerializedSuspendableExecutionContext(throughput)
+<<< config style with empty arg list 1
+object a {
+  foo(
+  )
+}
+>>>
+object a {
+  foo(
+  )
+}
+<<< config style with empty arg list 2
+object a {
+  foo( // c1
+  )
+}
+>>>
+object a {
+  foo( // c1
+  )
+}
+<<< config style with empty arg list 3
+object a {
+  foo(
+    // c1
+  )
+}
+>>>
+object a {
+  foo(
+      // c1
+  )
+}
+<<< #1798
+preset = intellij
+danglingParentheses.preset = true
+optIn.configStyleArguments = true
+===
+  commonConfig(
+      debugConfig(on = false)
+        .withFallback(ConfigFactory.parseString("""
+      akka.cluster.periodic-tasks-initial-delay = 300 s # turn off all periodic tasks
+      akka.cluster.publish-stats-interval = 0 s # always, when it happens
+      """))
+        .withFallback(
+            MultiNodeClusterSpec.clusterConfigWithFailureDetectorPuppet))
+>>>
+commonConfig(
+  debugConfig(on = false)
+    .withFallback(ConfigFactory.parseString("""
+      akka.cluster.periodic-tasks-initial-delay = 300 s # turn off all periodic tasks
+      akka.cluster.publish-stats-interval = 0 s # always, when it happens
+      """))
+    .withFallback(MultiNodeClusterSpec.clusterConfigWithFailureDetectorPuppet)
+)
+<<< #1799
+preset = intellij
+danglingParentheses.preset = true
+optIn.configStyleArguments = true
+===
+override final def next(): To =
+  if (hasNext) {
+    val ret = _next
+    _next = null.asInstanceOf[To] // Mark as consumed aaaaaaaaaaaaaaaaaa(nice to the GC, don't leak the last returned value)
+    _hasNext = false // Mark as consumed (we need to look for the next value)
+    ret
+  } else throw new java.util.NoSuchElementException("next")
+>>>
+override final def next(): To =
+  if (hasNext) {
+    val ret = _next
+    _next =
+      null.asInstanceOf[To] // Mark as consumed aaaaaaaaaaaaaaaaaa(nice to the GC, don't leak the last returned value)
+    _hasNext = false // Mark as consumed (we need to look for the next value)
+    ret
+  } else throw new java.util.NoSuchElementException("next")
+<<< #1800
+preset = intellij
+danglingParentheses.preset = true
+optIn.configStyleArguments = true
+===
+final case class StreamedEntityCreator[
+    -A <: ParserOutput, +B >: HttpEntity.Strict <: HttpEntity](
+    creator: Source[A, NotUsed] ⇒ B)
+    extends EntityCreator[A, B] {
+  def apply(parts: Source[A, NotUsed]) = creator(parts)
+}
+>>>
+final case class StreamedEntityCreator[
+  -A <: ParserOutput,
+  +B >: HttpEntity.Strict <: HttpEntity
+](creator: Source[A, NotUsed] ⇒ B)
+    extends EntityCreator[A, B] {
+  def apply(parts: Source[A, NotUsed]) = creator(parts)
+}
+<<< #1801
+preset = intellij
+danglingParentheses.preset = true
+optIn.configStyleArguments = true
+newlines.avoidForSimpleOverflow = [tooLong]
+===
+pushInput(closeFrame(
+                Protocol.CloseCodes.UnexpectedCondition,
+                mask = true,
+                msg = "This alien landing came quite unexpected. Communication has been garbled."))
+>>>
+pushInput(
+  closeFrame(
+    Protocol.CloseCodes.UnexpectedCondition,
+    mask = true,
+    msg = "This alien landing came quite unexpected. Communication has been garbled."
+  )
+)
+<<< #1802
+preset = intellij
+danglingParentheses.preset = true
+optIn.configStyleArguments = true
+===
+`WWW-Authenticate`(
+          HttpChallenge("Digest",
+                        "testrealm@host.com",
+                        Map("qop" -> "auth,auth-int",
+                            "nonce" -> "dcd98b7102dd2f0e8b11d0f600bfb0c093",
+                            "opaque" -> "5ccc069c403ebaf9f0171e9517f40e41")))
+        .renderedTo(
+          "Digest realm=\"testrealm@host.com\",qop=\"auth,auth-int\",nonce=dcd98b7102dd2f0e8b11d0f600bfb0c093,opaque=5ccc069c403ebaf9f0171e9517f40e41")
+>>>
+`WWW-Authenticate`(
+  HttpChallenge(
+    "Digest",
+    "testrealm@host.com",
+    Map(
+      "qop" -> "auth,auth-int",
+      "nonce" -> "dcd98b7102dd2f0e8b11d0f600bfb0c093",
+      "opaque" -> "5ccc069c403ebaf9f0171e9517f40e41"
+    )
+  )
+)
+  .renderedTo(
+    "Digest realm=\"testrealm@host.com\",qop=\"auth,auth-int\",nonce=dcd98b7102dd2f0e8b11d0f600bfb0c093,opaque=5ccc069c403ebaf9f0171e9517f40e41"
+  )
+<<< #1803
+preset = intellij
+danglingParentheses.preset = true
+optIn.configStyleArguments = true
+optIn.breakChainOnFirstMethodDot = true
+===
+Await
+          .result(
+              Unmarshal(HttpEntity(
+                      `multipart/mixed` withBoundary "XYZABC" withCharset `UTF-8`,
+                      """this is
+            |just preamble text""".stripMarginWithNewline("\r\n")))
+                .to[Multipart.General]
+                .failed,
+              1.second)
+          .getMessage
+>>>
+Await
+  .result(
+    Unmarshal(
+      HttpEntity(
+        `multipart/mixed` withBoundary "XYZABC" withCharset `UTF-8`,
+        """this is
+            |just preamble text""".stripMarginWithNewline("\r\n")
+      )
+    )
+      .to[Multipart.General]
+      .failed,
+    1.second
+  )
+  .getMessage
+<<< #1803, no breakChainOnFirstMethodDot
+preset = intellij
+danglingParentheses.preset = true
+optIn.configStyleArguments = true
+optIn.breakChainOnFirstMethodDot = false
+===
+Await
+          .result(
+              Unmarshal(HttpEntity(
+                      `multipart/mixed` withBoundary "XYZABC" withCharset `UTF-8`,
+                      """this is
+            |just preamble text""".stripMarginWithNewline("\r\n")))
+                .to[Multipart.General]
+                .failed,
+              1.second)
+          .getMessage
+>>>
+Await
+  .result(
+    Unmarshal(
+      HttpEntity(
+        `multipart/mixed` withBoundary "XYZABC" withCharset `UTF-8`,
+        """this is
+            |just preamble text""".stripMarginWithNewline("\r\n")
+      )
+    ).to[Multipart.General].failed,
+    1.second
+  )
+  .getMessage
+<<< #1804
+preset = intellij
+danglingParentheses.preset = true
+optIn.configStyleArguments = true
+optIn.breakChainOnFirstMethodDot = true
+===
+object a {
+  lazy val mod = project(
+      "mod",
+      Seq(common, db, user, hub, security, game, analyse, evaluation, report))
+    .settings(
+      libraryDependencies ++= provided(play.api, play.test, RM, PRM)
+  )
+}
+>>>
+object a {
+  lazy val mod = project(
+    "mod",
+    Seq(common, db, user, hub, security, game, analyse, evaluation, report)
+  )
+    .settings(
+      libraryDependencies ++= provided(play.api, play.test, RM, PRM)
+    )
+}
+<<< #1804, no breakChainOnFirstMethodDot
+preset = intellij
+danglingParentheses.preset = true
+optIn.configStyleArguments = true
+optIn.breakChainOnFirstMethodDot = false
+===
+object a {
+  lazy val mod = project(
+      "mod",
+      Seq(common, db, user, hub, security, game, analyse, evaluation, report))
+    .settings(
+      libraryDependencies ++= provided(play.api, play.test, RM, PRM)
+  )
+}
+>>>
+object a {
+  lazy val mod = project(
+    "mod",
+    Seq(common, db, user, hub, security, game, analyse, evaluation, report)
+  ).settings(
+    libraryDependencies ++= provided(play.api, play.test, RM, PRM)
+  )
+}
+<<< #1804 bis
+preset = intellij
+danglingParentheses.preset = true
+optIn.configStyleArguments = true
+optIn.breakChainOnFirstMethodDot = true
+===
+object a {
+  lazy val mod = project(
+      "mod",
+      Seq(common, db, user, hub, security, game, analyse, evaluation, report))
+    .settings(
+      libraryDependencies ++= provided(play.api, play.test, RM, PRM)
+  )
+    .settings(
+      libraryDependencies ++= provided(play.api, play.test, RM, PRM)
+  )
+}
+>>>
+object a {
+  lazy val mod = project(
+    "mod",
+    Seq(common, db, user, hub, security, game, analyse, evaluation, report)
+  )
+    .settings(
+      libraryDependencies ++= provided(play.api, play.test, RM, PRM)
+    )
+    .settings(
+      libraryDependencies ++= provided(play.api, play.test, RM, PRM)
+    )
+}
+<<< #1804 bis, no breakChainOnFirstMethodDot
+preset = intellij
+danglingParentheses.preset = true
+optIn.configStyleArguments = true
+optIn.breakChainOnFirstMethodDot = false
+===
+object a {
+  lazy val mod = project(
+      "mod",
+      Seq(common, db, user, hub, security, game, analyse, evaluation, report))
+    .settings(
+      libraryDependencies ++= provided(play.api, play.test, RM, PRM)
+  )
+    .settings(
+      libraryDependencies ++= provided(play.api, play.test, RM, PRM)
+  )
+}
+>>>
+object a {
+  lazy val mod = project(
+    "mod",
+    Seq(common, db, user, hub, security, game, analyse, evaluation, report)
+  ).settings(
+    libraryDependencies ++= provided(play.api, play.test, RM, PRM)
+  ).settings(
+    libraryDependencies ++= provided(play.api, play.test, RM, PRM)
+  )
+}
+<<< #1400, breaksInsideChains T, noBB
+preset = intellij
+danglingParentheses.preset = true
+optIn.configStyleArguments = true
+optIn.breakChainOnFirstMethodDot = false
+optIn.breaksInsideChains = true
+===
+object Test {
+  Try {
+    "something1"
+  }.recover { // no break
+      case NonFatal(_) => "something2"
+    }
+    .getOrElse{ // break
+      "something3"
+    }
+}
+>>>
+object Test {
+  Try {
+    "something1"
+  }.recover { // no break
+    case NonFatal(_) => "something2"
+  }
+    .getOrElse { // break
+      "something3"
+    }
+}
+<<< #1400, breaksInsideChains T, noBnoB
+preset = intellij
+danglingParentheses.preset = true
+optIn.configStyleArguments = true
+optIn.breakChainOnFirstMethodDot = false
+optIn.breaksInsideChains = true
+===
+object Test {
+  Try {
+    "something1"
+  }.recover { // no break
+      case NonFatal(_) => "something2"
+    }.getOrElse{ // no break
+      "something3"
+    }
+}
+>>>
+object Test {
+  Try {
+    "something1"
+  }.recover { // no break
+    case NonFatal(_) => "something2"
+  }.getOrElse { // no break
+      "something3"
+    }
+}
+<<< #1400, breaksInsideChains T, BB
+preset = intellij
+danglingParentheses.preset = true
+optIn.configStyleArguments = true
+optIn.breakChainOnFirstMethodDot = false
+optIn.breaksInsideChains = true
+===
+object Test {
+  Try {
+    "something1"
+  }
+    .recover { // break
+      case NonFatal(_) => "something2"
+    }
+    .getOrElse{ // break
+      "something3"
+    }
+}
+>>>
+object Test {
+  Try {
+    "something1"
+  }.recover { // break
+    case NonFatal(_) => "something2"
+  }
+    .getOrElse { // break
+      "something3"
+    }
+}
+<<< #1400, breaksInsideChains T, BnoB
+preset = intellij
+danglingParentheses.preset = true
+optIn.configStyleArguments = true
+optIn.breakChainOnFirstMethodDot = false
+optIn.breaksInsideChains = true
+===
+object Test {
+  Try {
+    "something1"
+  }
+    .recover { // break
+      case NonFatal(_) => "something2"
+    }.getOrElse{ // no break
+      "something3"
+    }
+}
+>>>
+object Test {
+  Try {
+    "something1"
+  }.recover { // break
+    case NonFatal(_) => "something2"
+  }.getOrElse { // no break
+      "something3"
+    }
+}
+<<< #1400, breaksInsideChains F, noBB
+preset = intellij
+danglingParentheses.preset = true
+optIn.configStyleArguments = true
+optIn.breakChainOnFirstMethodDot = false
+optIn.breaksInsideChains = false
+===
+object Test {
+  Try {
+    "something1"
+  }.recover { // no break
+      case NonFatal(_) => "something2"
+    }
+    .getOrElse{ // break
+      "something3"
+    }
+}
+>>>
+object Test {
+  Try {
+    "something1"
+  }.recover { // no break
+    case NonFatal(_) => "something2"
+  }.getOrElse { // break
+    "something3"
+  }
+}
+<<< #1400, breaksInsideChains F, noBnoB
+preset = intellij
+danglingParentheses.preset = true
+optIn.configStyleArguments = true
+optIn.breakChainOnFirstMethodDot = false
+optIn.breaksInsideChains = false
+===
+object Test {
+  Try {
+    "something1"
+  }.recover { // no break
+      case NonFatal(_) => "something2"
+    }.getOrElse{ // no break
+      "something3"
+    }
+}
+>>>
+object Test {
+  Try {
+    "something1"
+  }.recover { // no break
+    case NonFatal(_) => "something2"
+  }.getOrElse { // no break
+    "something3"
+  }
+}
+<<< #1400, breaksInsideChains F, BB
+preset = intellij
+danglingParentheses.preset = true
+optIn.configStyleArguments = true
+optIn.breakChainOnFirstMethodDot = false
+optIn.breaksInsideChains = false
+===
+object Test {
+  Try {
+    "something1"
+  }
+    .recover { // break
+      case NonFatal(_) => "something2"
+    }
+    .getOrElse{ // break
+      "something3"
+    }
+}
+>>>
+object Test {
+  Try {
+    "something1"
+  }.recover { // break
+    case NonFatal(_) => "something2"
+  }.getOrElse { // break
+    "something3"
+  }
+}
+<<< #1400, breaksInsideChains F, BnoB
+preset = intellij
+danglingParentheses.preset = true
+optIn.configStyleArguments = true
+optIn.breakChainOnFirstMethodDot = false
+optIn.breaksInsideChains = false
+===
+object Test {
+    Try {
+      "something1"
+    }
+      .recover { // break
+        case NonFatal(_) => "something2"
+      }.getOrElse{ // no break
+        "something3"
+      }
+}
+>>>
+object Test {
+  Try {
+    "something1"
+  }.recover { // break
+    case NonFatal(_) => "something2"
+  }.getOrElse { // no break
+    "something3"
+  }
+}
+<<< #1505 1
+maxColumn = 75
+align.preset = none
+newlines.avoidForSimpleOverflow = [toolong]
+===
+object a {
+         Seq(
+           "HTTP/1.1 204 12345678",
+           "90123456789012\r\n") should generalMultiParseTo(
+           Left(MessageStartError(
+             400: StatusCode,
+             ErrorInfo(
+               "Response reason phrase exceeds the configured limit of 21 characters"))))
+}
+>>>
+object a {
+  Seq(
+      "HTTP/1.1 204 12345678",
+      "90123456789012\r\n") should generalMultiParseTo(
+      Left(MessageStartError(
+          400: StatusCode,
+          ErrorInfo("Response reason phrase exceeds the configured limit of 21 characters"))))
+}
+<<< #1505 2 skip multiple args
+maxColumn = 75
+align.preset = none
+newlines.avoidForSimpleOverflow = [toolong]
+===
+object a {
+   response shouldEqual HttpResponse(
+     status = 302,
+     entity = HttpEntity(
+       ContentTypes.`text/html(UTF-8)`,
+       "The requested resource temporarily resides under <a href=\"/foo\">this URI</a>."),
+     headers = Location("/foo") :: Nil
+   )
+}
+>>>
+object a {
+  response shouldEqual HttpResponse(
+      status = 302,
+      entity = HttpEntity(
+          ContentTypes.`text/html(UTF-8)`,
+          "The requested resource temporarily resides under <a href=\"/foo\">this URI</a>."),
+      headers = Location("/foo") :: Nil
+  )
+}
+<<< #1505 3
+maxColumn = 75
+align.preset = none
+newlines.avoidForSimpleOverflow = [toolong]
+===
+object a {
+   "allow mapping the response" in {
+     val timeoutResponse = HttpResponse(
+       StatusCodes.EnhanceYourCalm,
+       entity =
+         "Unable to serve response within time limit, please enchance your calm.")
+   }
+}
+>>>
+object a {
+  "allow mapping the response" in {
+    val timeoutResponse = HttpResponse(
+        StatusCodes.EnhanceYourCalm,
+        entity = "Unable to serve response within time limit, please enchance your calm.")
+  }
+}
+<<< #1505 4 short unchanged
+maxColumn = 75
+align.preset = none
+newlines.avoidForSimpleOverflow = [toolong]
+===
+object a {
+        val boss = system.actorOf(Props(new Actor {
+          def receive = {
+            case "run" ⇒
+              for (_ ← 1 to num)(context.watch(
+                context.actorOf(props))) ! cachedMessage
+            case Terminated(child) ⇒ stopLatch.countDown()
+          }
+        }).withDispatcher("boss"))
+}
+>>>
+object a {
+  val boss = system.actorOf(Props(new Actor {
+    def receive = {
+      case "run" ⇒
+        for (_ ← 1 to num)(context.watch(
+            context.actorOf(props))) ! cachedMessage
+      case Terminated(child) ⇒ stopLatch.countDown()
+    }
+  }).withDispatcher("boss"))
+}
+<<< #1505 5 two args, second single letter
+newlines.avoidForSimpleOverflow = [toolong]
+===
+object a {
+  notifyError(
+    "Startup timed out. This is usually related to actor system host setting or host name resolution misconfiguration.",
+    e)
+}
+>>>
+object a {
+  notifyError(
+      "Startup timed out. This is usually related to actor system host setting or host name resolution misconfiguration.",
+      e)
+}
+<<< #2033
+align.openParenCallSite = true
+===
+class Test {
+  val testCases = List(
+    ("Old state", "Campaign data", "Expected state"),
+    (
+      1,
+      2,
+      3
+    )
+  )
+}
+>>>
+class Test {
+  val testCases = List(
+      ("Old state", "Campaign data", "Expected state"),
+      (
+          1,
+          2,
+          3
+      )
+  )
+}
+<<< #2175 1 nested assign with apply and long comment
+preset = default
+===
+object a {
+  def i: Item =
+    i.copy(
+      name = b(c) // Very long comment here because I need to have more than 80 characters
+    )
+}
+>>>
+object a {
+  def i: Item =
+    i.copy(
+      name = b(
+        c
+      ) // Very long comment here because I need to have more than 80 characters
+    )
+}
+<<< #2175 2 nested assign with apply and long comment
+preset = default
+===
+object a {
+  def i: Item =
+    i.copy(
+      name = b(
+        c
+      ) // Very long comment here because I need to have more than 80 characters
+    )
+}
+>>>
+object a {
+  def i: Item =
+    i.copy(
+      name = b(
+        c
+      ) // Very long comment here because I need to have more than 80 characters
+    )
 }

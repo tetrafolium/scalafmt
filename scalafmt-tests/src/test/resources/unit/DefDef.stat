@@ -39,8 +39,8 @@ def identity[T](t: T): T = t
         sym.hasAnnotation(JSBracketCallAnnotation)
 >>>
 def hasExplicitJSEncoding =
-  sym
-    .hasAnnotation(JSNameAnnotation) ||
+  sym.hasAnnotation(
+      JSNameAnnotation) ||
     sym.hasAnnotation(
         JSBracketAccessAnnotation) ||
     sym.hasAnnotation(
@@ -120,4 +120,71 @@ def heyImCool = {
 def heyImCool = {
   val c = b.foobar
 
+}
+<<< multiple bracket and paren groups with comments 1
+  implicit def xorBifunctor: Bitraverse[Xor] =
+    new Bitraverse[Xor] {
+      def bitraverse[G[_], A, B, C, D](/*c1*/fab: Xor[A, B])(/*c2*/
+          f: A => G[C],
+          g: B => G[D])(implicit G: Applicative[G]): G[Xor[C, D]] =
+        fab match {
+          case Xor.Left(a)  => G.map(f(a))(Xor.left)
+          case Xor.Right(b) => G.map(g(b))(Xor.right)
+        }
+}
+>>>
+implicit def xorBifunctor
+    : Bitraverse[Xor] =
+  new Bitraverse[Xor] {
+    def bitraverse[G[_], A, B, C, D](
+        /*c1*/ fab: Xor[A, B])(
+        /*c2*/
+        f: A => G[C],
+        g: B => G[D])(implicit
+        G: Applicative[G])
+        : G[Xor[C, D]] =
+      fab match {
+        case Xor.Left(a) =>
+          G.map(f(a))(Xor.left)
+        case Xor.Right(b) =>
+          G.map(g(b))(Xor.right)
+      }
+  }
+<<< multiple bracket and paren groups with comments 2
+val a = new a[b, c](/*c1*/d => e)(/*c2*/f => g, h => i)(/*c3*/j => k)
+>>>
+val a = new a[b, c]( /*c1*/ d => e)(
+    /*c2*/ f => g,
+    h => i)( /*c3*/ j => k)
+<<< #2179 avoidInResultType=true
+newlines.avoidInResultType = true
+===
+object a {
+  implicit protected val td: TildeArrow[RequestContext, Future[RouteResult]] {
+    type Out = RouteTestResult
+  } = TildeArrow.injectIntoRoute
+}
+>>>
+object a {
+  implicit protected val td
+      : TildeArrow[RequestContext, Future[RouteResult]] {
+        type Out = RouteTestResult
+      } = TildeArrow.injectIntoRoute
+}
+<<< #2179 avoidInResultType=false
+newlines.avoidInResultType = false
+===
+object a {
+  implicit protected val td: TildeArrow[RequestContext, Future[RouteResult]] {
+    type Out = RouteTestResult
+  } = TildeArrow.injectIntoRoute
+}
+>>>
+object a {
+  implicit protected val td
+      : TildeArrow[
+          RequestContext,
+          Future[RouteResult]] {
+        type Out = RouteTestResult
+      } = TildeArrow.injectIntoRoute
 }

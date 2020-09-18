@@ -1,11 +1,11 @@
 package org.scalafmt
 
+import org.scalatest.funsuite.AnyFunSuite
 import org.scalafmt.config.LineEndings._
 import org.scalafmt.config.ScalafmtConfig
 import org.scalafmt.util.DiffAssertions
-import org.scalatest.FunSuite
 
-class LineEndingsTest extends FunSuite with DiffAssertions {
+class LineEndingsTest extends AnyFunSuite with DiffAssertions {
 
   test(
     "code with windows line endings after formatting with line endings preserve setting should have the same endings"

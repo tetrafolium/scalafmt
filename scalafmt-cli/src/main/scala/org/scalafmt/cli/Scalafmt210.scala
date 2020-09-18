@@ -5,7 +5,6 @@ import scala.util.matching.Regex
 import java.io.File
 
 import metaconfig._, Configured._
-import org.scalafmt.Error.InvalidScalafmtConfiguration
 import org.scalafmt.Formatted
 import org.scalafmt.Scalafmt
 import org.scalafmt.config.ScalafmtConfig
@@ -51,7 +50,7 @@ class Scalafmt210 {
       if (filename.endsWith(".sbt")) SRunner.sbt
       else SRunner.default
     val style = scalafmtStyle.copy(runner = runner)
-    Scalafmt.format(code, style) match {
+    Scalafmt.formatCode(code, style, filename = filename).formatted match {
       case Formatted.Success(formattedCode) => formattedCode
       case error =>
         error match {

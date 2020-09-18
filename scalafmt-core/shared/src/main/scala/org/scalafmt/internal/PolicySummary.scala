@@ -1,44 +1,32 @@
 package org.scalafmt.internal
 
-import org.scalafmt.internal.Policy.NoPolicy
+import scala.meta.tokens.Token
+
 import org.scalafmt.util.LoggerOps
 
-class PolicySummary(val policies: Vector[Policy]) {
+class PolicySummary(val policies: Seq[Policy]) {
   import LoggerOps._
 
-  @inline def noDequeue = policies.exists { x =>
-    x.isSingleLine || x.noDequeue
-  }
+  @inline def noDequeue = policies.exists(_.noDequeue)
 
-  @inline def isSafe = !noDequeue
+  def combine(other: Policy, ft: FormatToken): PolicySummary =
+    if (ft.right.is[Token.EOF]) PolicySummary.empty
+    else new PolicySummary((other +: policies).flatMap(_.unexpiredOpt(ft)))
 
-  def combine(other: Policy, position: Int): PolicySummary = {
-    // TODO(olafur) filter policies by expiration date
-    val activePolicies = policies.filter(_.expire > position)
-    val newPolicies =
-      if (other == NoPolicy) activePolicies
-      else other +: activePolicies
-    new PolicySummary(newPolicies)
-  }
-
-  def execute(decision: Decision, debug: Boolean = false): Decision = {
-    var last = decision
-    var result = decision
-    policies.foreach { policy =>
-      if (policy.f.isDefinedAt(result)) {
-        last = result
-        result = policy.f(result)
-        // TODO(olafur Would be nice to enforce this at compile time.
-        assert(result.formatToken == last.formatToken)
-        if (debug) {
-          logger.debug(s"$policy defined at $result")
+  def execute(decision: Decision, debug: Boolean = false): Decision =
+    policies.foldLeft(decision) {
+      case (result, policy) =>
+        def withSplits(splits: Seq[Split]): Decision = {
+          if (debug) logger.debug(s"$policy defined at $result")
+          result.withSplits(splits)
         }
-      }
+        policy.f
+          .andThen(withSplits _)
+          .applyOrElse(result, identity[Decision])
     }
-    result
-  }
+
 }
 
 object PolicySummary {
-  val empty = new PolicySummary(Vector.empty[Policy])
+  val empty = new PolicySummary(Seq.empty)
 }

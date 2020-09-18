@@ -5,34 +5,35 @@ import java.nio.file.{Files, Path, Paths}
 import metaconfig.Configured.NotOk
 import metaconfig.Configured.Ok
 import org.scalafmt.config.{Config, ScalafmtConfig}
-import org.scalatest.FunSuite
 import FileTestOps._
 import org.scalafmt.Versions
+import org.scalatest.funsuite.AnyFunSuite
 
-class CliOptionsTest extends FunSuite {
+class CliOptionsTest extends AnyFunSuite {
 
-  test("style = ...") {
+  test("preset = ...") {
     import org.scalafmt.config.Config
-    val NotOk(err) = Config.fromHoconString("style = foobar")
+    val NotOk(err) = Config.fromHoconString("preset = foobar")
     assert(
-      "Unknown style name foobar. Expected one of: Scala.js, IntelliJ, default, defaultWithAlign" == err.msg
+      "Unknown style \"foobar\". Expected one of: " +
+        "Scala.js, IntelliJ, default, defaultWithAlign" == err.msg
     )
 
-    val overrideOne = Config.fromHoconString("""|style = defaultWithAlign
-                                                |maxColumn = 100
-                                                |""".stripMargin)
+    val overrideOne = Config.fromHoconString("""|preset = defaultWithAlign
+      |maxColumn = 100
+      |""".stripMargin)
     assert(
       Ok(ScalafmtConfig.defaultWithAlign.copy(maxColumn = 100)) == overrideOne
     )
     assert(
-      Ok(ScalafmtConfig.intellij) == Config.fromHoconString("style = intellij")
+      Ok(ScalafmtConfig.intellij) == Config.fromHoconString("preset = intellij")
     )
     assert(
-      Ok(ScalafmtConfig.scalaJs) == Config.fromHoconString("style = Scala.js")
+      Ok(ScalafmtConfig.scalaJs) == Config.fromHoconString("preset = Scala.js")
     )
     assert(
       Ok(ScalafmtConfig.defaultWithAlign) == Config
-        .fromHoconString("style = defaultWithAlign")
+        .fromHoconString("preset = defaultWithAlign")
     )
   }
 
@@ -83,10 +84,10 @@ class CliOptionsTest extends FunSuite {
     val expected = "foo bar"
     val configPath = Files.createTempFile(".scalafmt", ".conf")
     val config = s"""
-                    |version="${Versions.version}"
-                    |maxColumn=100
-                    |onTestFailure="$expected"
-                    |""".stripMargin
+      |version="${Versions.version}"
+      |maxColumn=100
+      |onTestFailure="$expected"
+      |""".stripMargin
     Files.write(configPath, config.getBytes)
 
     val opt = baseCliOptions.copy(config = Some(configPath))
@@ -94,7 +95,7 @@ class CliOptionsTest extends FunSuite {
   }
 
   test(
-    ".scalafmtConfig returns default ScalafmtConfig is configuration file is missing"
+    ".scalafmtConfig returns default ScalafmtConfig if configuration file is missing"
   ) {
     val configDir = Files.createTempDirectory("temp-dir")
     val configPath = Paths.get(configDir.toString + "/.scalafmt.conf")
@@ -110,5 +111,14 @@ class CliOptionsTest extends FunSuite {
       )
     )
     assert(opt.scalafmtConfig.isNotOk)
+  }
+
+  test("don't write info when writing to stdout") {
+    val stdinArgs = Array("--stdin")
+    val stdoutArgs = Array("--stdout")
+    for (args <- Seq(stdinArgs, stdoutArgs)) {
+      val options = Cli.getConfig(args, baseCliOptions).get
+      assert(options.common.info == NoopOutputStream.printStream)
+    }
   }
 }

@@ -95,10 +95,12 @@
 {
   {
     def bindingInfoWithFields(style: BindingStyle) =
-      logger.trace("Looking for fields with style %s".format(style), (for {
-        field <- fields;
-        bindingInfo <- field.binding if bindingInfo.bindingStyle == style
-      } yield (bindingInfo, field)).toList)
+      logger.trace(
+          "Looking for fields with style %s".format(style),
+          (for {
+            field <- fields;
+            bindingInfo <- field.binding if bindingInfo.bindingStyle == style
+          } yield (bindingInfo, field)).toList)
   }
 }
 <<< indent too low
@@ -138,11 +140,12 @@
    case name => CPathField(name)
  }) :: acc)
 >>>
-parse0(tail, (head match {
-  case "[*]" => CPathArray
-  case IndexPattern(index) => CPathIndex(index.toInt)
-  case name => CPathField(name)
-}) :: acc)
+parse0(tail,
+       (head match {
+         case "[*]" => CPathArray
+         case IndexPattern(index) => CPathIndex(index.toInt)
+         case name => CPathField(name)
+       }) :: acc)
 <<< #394 this sucks but so does your tuple
 {{
     (ref.copy(selector = (prefix \ ref.selector)),
@@ -157,13 +160,14 @@ parse0(tail, (head match {
 >>>
 {
   {
-    (ref.copy(selector = (prefix \ ref.selector)), (ref.ctype match {
-      case CString => ArrayStrColumn.empty(sliceSize)
-      case CBoolean => ArrayBoolColumn.empty()
-      case CArrayType(elemType) =>
-        ArrayHomogeneousArrayColumn.empty(sliceSize)(elemType)
-      case CUndefined => sys.error("CUndefined cannot be serialized")
-    }))
+    (ref.copy(selector = (prefix \ ref.selector)),
+     (ref.ctype match {
+       case CString => ArrayStrColumn.empty(sliceSize)
+       case CBoolean => ArrayBoolColumn.empty()
+       case CArrayType(elemType) =>
+         ArrayHomogeneousArrayColumn.empty(sliceSize)(elemType)
+       case CUndefined => sys.error("CUndefined cannot be serialized")
+     }))
   }
 }
 <<< #394 just use variable, it's fine
@@ -199,11 +203,12 @@ val second =
         case _ => 2
       }))
 >>>
-assertEquals(1, ((NoContext: Any) match {
-  case that: AnyRef if this eq that => 0
-  case NoContext => 1
-  case _ => 2
-}))
+assertEquals(1,
+             ((NoContext: Any) match {
+               case that: AnyRef if this eq that => 0
+               case NoContext => 1
+               case _ => 2
+             }))
 <<< #394 4
 {{{{
         b sort {
@@ -253,20 +258,16 @@ assertEquals(1, ((NoContext: Any) match {
 >>>
 {
   {
-    copy(user1 = user1.copy(
-             score =
-               user1.score + (userId match {
-                 case None => wins * 5
-                 case Some(u) if user1.id == u => wins * 10
-                 case _ => 0
-               })),
-         user2 = user2.copy(
-             score =
-               user2.score + (userId match {
-                 case None => wins * 5
-                 case Some(u) if user2.id == u => wins * 10
-                 case _ => 0
-               })))
+    copy(user1 = user1.copy(score = user1.score + (userId match {
+           case None => wins * 5
+           case Some(u) if user1.id == u => wins * 10
+           case _ => 0
+         })),
+         user2 = user2.copy(score = user2.score + (userId match {
+           case None => wins * 5
+           case Some(u) if user2.id == u => wins * 10
+           case _ => 0
+         })))
   }
 }
 <<< #394 6
@@ -327,13 +328,12 @@ assertEquals(1, ((NoContext: Any) match {
 }
 >>>
 {
-  val sourceToBuffer: Map[ScaldingSource, Buffer[Tuple]] = (lasts.map {
-    case (b, it) =>
+  val sourceToBuffer: Map[ScaldingSource, Buffer[Tuple]] =
+    (lasts.map { case (b, it) =>
       lastMappable(b) -> toBuffer(it)
-  } ++ streams.map {
-    case (b, it) =>
+    } ++ streams.map { case (b, it) =>
       streamMappable(b) -> toBuffer(it)
-  }).toMap
+    }).toMap
 }
 <<< nullDF
 {

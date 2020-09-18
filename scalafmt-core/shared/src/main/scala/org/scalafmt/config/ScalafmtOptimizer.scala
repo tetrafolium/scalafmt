@@ -31,7 +31,7 @@ import metaconfig._
   *                   solution that reaches the same point later, the first
   *                   solution is preferred if it can be verified to be
   *                   always better (see
-  *                   [[org.scalafmt.internal.State.alwaysBetter()]]).
+  *                   [[org.scalafmt.internal.State.alwaysBetter]]).
   *
   *                   Note. This affects the output positively because it
   *                   breaks a tie between two equally expensive solutions
@@ -63,7 +63,7 @@ import metaconfig._
 case class ScalafmtOptimizer(
     dequeueOnNewStatements: Boolean = true,
     escapeInPathologicalCases: Boolean = true,
-    maxVisitsPerToken: Int = 513,
+    maxVisitsPerToken: Int = 10000,
     maxEscapes: Int = 16,
     maxDepth: Int = 100,
     acceptOptimalAtHints: Boolean = true,

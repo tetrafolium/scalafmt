@@ -37,9 +37,7 @@ def withDedicatedVar: Unit = {
   {
     {
       preloads.foreach { p =>
-        cache.getOrElseUpdate(p, futureStreams.map { r =>
-          r.streams.get(p)
-        })
+        cache.getOrElseUpdate(p, futureStreams.map { r => r.streams.get(p) })
       }
     }
   }
@@ -57,17 +55,18 @@ def withDedicatedVar: Unit = {
       end withValue res.value
     })
 >>>
-(excty, { focus: Focus =>
-  val enter = symopt.map { sym =>
-    val cast = focus withOp Op.As(excty, exc.value)
-    curEnv.enter(sym, cast.value)
-    cast
-  }.getOrElse(focus)
-  val begin = enter withOp Nrt.call(Nrt.begin_catch, excwrap.value)
-  val res = genExpr(body, begin)
-  val end = res withOp Nrt.call(Nrt.end_catch)
-  end withValue res.value
-})
+(excty,
+ { focus: Focus =>
+   val enter = symopt.map { sym =>
+     val cast = focus withOp Op.As(excty, exc.value)
+     curEnv.enter(sym, cast.value)
+     cast
+   }.getOrElse(focus)
+   val begin = enter withOp Nrt.call(Nrt.begin_catch, excwrap.value)
+   val res = genExpr(body, begin)
+   val end = res withOp Nrt.call(Nrt.end_catch)
+   end withValue res.value
+ })
 <<< SKIP intellij bug
 class ScProjectionType private () {
   def isAliasTypeInner = {
@@ -193,3 +192,272 @@ pairList.map(pair => {
 val add = (x: Int) => x + 2
 >>>
 val add = (x: Int) => x + 2
+<<< #965
+preset = defaultWithAlign
+maxColumn = 120
+newlines.sometimesBeforeColonInMethodReturnType = false
+align.openParenCallSite = false
+rewrite.rules = [RedundantBraces, RedundantParens]
+===
+def test(dataFrame: DataFrame) = {
+    val zeroAccumulator = Array.fill(1)(((0.0, 0)))
+
+    dataFrame.rdd.aggregate(zeroAccumulator)({(acc, row) => acc.zip(row.toSeq).map{ case (x, y) => {
+      if(true) (1, 2)
+      else (x._1 + 2, x._2 + 1)
+    }}},
+      {(acc1, acc2) => acc1.zip(acc2).map{ case (x, y) => (x._1 + y._1, x._2 + y._2)}})
+      .map{case (sum, count) => sum}
+  }
+>>>
+def test(dataFrame: DataFrame) = {
+  val zeroAccumulator = Array.fill(1)(((0.0, 0)))
+
+  dataFrame.rdd
+    .aggregate(zeroAccumulator)(
+      (acc, row) =>
+        acc.zip(row.toSeq).map { case (x, y) =>
+          if (true) (1, 2)
+          else (x._1 + 2, x._2 + 1)
+        },
+      (acc1, acc2) => acc1.zip(acc2).map { case (x, y) => (x._1 + y._1, x._2 + y._2) }
+    )
+    .map { case (sum, count) => sum }
+}
+<<< one-line lambda: make sure infix is handled correctly
+object a {
+val parser = new scopt.OptionParser[ServerConfig]("CreateServer") {
+      opt[String]("batch") action { (x, c) =>
+        c.copy(batch = x)
+      } text ("Batch label of the deployment.")
+      opt[String]("engineId") action { (x, c) =>
+        c.copy(engineId = Some(x))
+      } text ("Engine ID.")
+  }
+}
+>>>
+object a {
+  val parser = new scopt.OptionParser[ServerConfig]("CreateServer") {
+    opt[String]("batch") action { (x, c) =>
+      c.copy(batch = x)
+    } text ("Batch label of the deployment.")
+    opt[String]("engineId") action { (x, c) =>
+      c.copy(engineId = Some(x))
+    } text ("Engine ID.")
+  }
+}
+<<< one-line lambda: make sure infix is handled correctly 2
+object a {
+cmd("help").action {
+ (_, c) => c.copy(commands = c.commands :+ "help")
+  } children (
+         arg[String]("<command>") optional ()
+          action { (x, c) =>
+            c.copy(commands = c.commands :+ x)
+          }
+       )
+}
+>>>
+object a {
+  cmd("help").action { (_, c) =>
+    c.copy(commands = c.commands :+ "help")
+  } children (
+      arg[String]("<command>") optional ()
+        action { (x, c) =>
+          c.copy(commands = c.commands :+ x)
+        }
+  )
+}
+<<< one-line lambda: make sure multiline string is handled correctly
+object a {
+val b = c { d => """The quick brown fox jumps over the lazy dog
+     | The quick brown fox jumps over the lazy dog
+     | The quick brown fox jumps over the lazy dog
+     |""".stripMargin }
+}
+>>>
+object a {
+  val b = c { d =>
+    """The quick brown fox jumps over the lazy dog
+     | The quick brown fox jumps over the lazy dog
+     | The quick brown fox jumps over the lazy dog
+     |""".stripMargin
+  }
+}
+<<< one-line lambda: make sure multiline string is handled correctly 2
+assumeStandardLibraryStripMargin = true
+===
+object a {
+val b = c { d => """The quick brown fox jumps over the lazy dog
+      | The quick brown fox jumps over the lazy dog
+      | The quick brown fox jumps over the lazy dog
+      |""".stripMargin }
+}
+>>>
+object a {
+  val b = c { d =>
+    """The quick brown fox jumps over the lazy dog
+      | The quick brown fox jumps over the lazy dog
+      | The quick brown fox jumps over the lazy dog
+      |""".stripMargin
+  }
+}
+<<< #1714 1
+testAsync("Resource.make is equivalent to a partially applied bracket") { implicit ec =>
+    check { (acquire: IO[String], release: String => IO[Unit], f: String => IO[String]) =>
+      acquire.bracket(f)(release) <-> Resource.make(acquire)(release).use(f)
+    }
+  }
+>>>
+testAsync("Resource.make is equivalent to a partially applied bracket") {
+  implicit ec =>
+    check {
+      (acquire: IO[String],
+       release: String => IO[Unit],
+       f: String => IO[String]) =>
+        acquire.bracket(f)(release) <-> Resource.make(acquire)(release).use(f)
+    }
+}
+<<< #1714 2
+align.preset = none
+maxColumn = 120
+danglingParentheses.preset = true
+===
+testAsync("Resource.make is equivalent to a partially applied bracket") { implicit ec =>
+    check { (acquire: IO[String], release: String => IO[Unit], f: String => IO[String]) =>
+      acquire.bracket(f)(release) <-> Resource.make(acquire)(release).use(f)
+    }
+  }
+>>>
+testAsync("Resource.make is equivalent to a partially applied bracket") { implicit ec =>
+  check { (acquire: IO[String], release: String => IO[Unit], f: String => IO[String]) =>
+    acquire.bracket(f)(release) <-> Resource.make(acquire)(release).use(f)
+  }
+}
+<<< #1714 3
+align.preset = none
+maxColumn = 120
+danglingParentheses.preset = true
+===
+testAsync("Resource.make is equivalent to a partially applied bracket") { implicit ec =>
+    check { (acquire: IO[String], release: String => IO[Unit], f: String => IO[String]/* c1 */)/* c2 */=>
+      /*c3*/ acquire.bracket(f)(release) <-> Resource.make(acquire)(release).use(f)
+    }
+  }
+>>>
+testAsync("Resource.make is equivalent to a partially applied bracket") { implicit ec =>
+  check { (acquire: IO[String], release: String => IO[Unit], f: String => IO[String] /* c1 */ ) /* c2 */ =>
+    /*c3*/
+    acquire.bracket(f)(release) <-> Resource.make(acquire)(release).use(f)
+  }
+}
+<<< #1714 4
+align.preset = none
+maxColumn = 120
+danglingParentheses.preset = true
+===
+testAsync("Resource.make is equivalent to a partially applied bracket") { implicit ec =>
+    check { (acquire: IO[String], release: String => IO[Unit], f: String => IO[String]/* c1 */)/* c2 */=>
+      /*c3*/ { acquire.bracket(f)(release) <-> Resource.make(acquire)(release).use(f) }
+    }
+  }
+>>>
+testAsync("Resource.make is equivalent to a partially applied bracket") { implicit ec =>
+  check { (acquire: IO[String], release: String => IO[Unit], f: String => IO[String] /* c1 */ ) /* c2 */ =>
+    /*c3*/
+    { acquire.bracket(f)(release) <-> Resource.make(acquire)(release).use(f) }
+  }
+}
+<<< #1714 5
+align.preset = none
+maxColumn = 120
+danglingParentheses.preset = true
+===
+testAsync("Resource.make is equivalent to a partially applied bracket") { implicit ec =>
+    check { (acquire: IO[String], release: String => IO[Unit], f: String => IO[String]/* c1 */)/* c2 */=>
+      { /*c3*/ acquire.bracket(f)(release) <-> Resource.make(acquire)(release).use(f) }
+    }
+  }
+>>>
+testAsync("Resource.make is equivalent to a partially applied bracket") { implicit ec =>
+  check { (acquire: IO[String], release: String => IO[Unit], f: String => IO[String] /* c1 */ ) /* c2 */ =>
+    { /*c3*/
+      acquire.bracket(f)(release) <-> Resource.make(acquire)(release).use(f)
+    }
+  }
+}
+<<< #448
+object Foo {
+  code.collect {
+    case d: Defn.Def if (d match {
+      case _ => false
+
+
+    }) &&
+      d=>
+  }
+}
+>>>
+object Foo {
+  code.collect {
+    case d: Defn.Def
+        if (d match {
+          case _ => false
+
+        }) &&
+          d =>
+  }
+}
+<<< #1485
+preset = IntelliJ
+maxColumn = 120
+===
+class A {
+  def foo: B =
+    a.b() { c =>
+        val d = c.add(
+          D[E](
+            1, {
+              case conditionNameShouldLongEnough =>
+                foo1(objectNameShouldLongEnough, objectNameShouldLongEnough)
+                0
+              case conditionNameShouldLongEnough =>
+                foo1(objectNameShouldLongEnough, objectNameShouldLongEnough)
+                1
+            }
+          )
+        )
+      }
+      .f("f")
+}
+>>>
+class A {
+  def foo: B =
+    a.b() { c =>
+      val d = c.add(
+        D[E](
+          1,
+          {
+            case conditionNameShouldLongEnough =>
+              foo1(objectNameShouldLongEnough, objectNameShouldLongEnough)
+              0
+            case conditionNameShouldLongEnough =>
+              foo1(objectNameShouldLongEnough, objectNameShouldLongEnough)
+              1
+          }
+        )
+      )
+    }.f("f")
+}
+<<< #1969
+object a {
+  And("foo") { () =>
+    // bar
+  }
+}
+>>>
+object a {
+  And("foo") { () =>
+    // bar
+  }
+}

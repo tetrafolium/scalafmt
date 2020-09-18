@@ -10,11 +10,9 @@ import org.scalafmt.util.AbsoluteFile
 import org.scalafmt.util.FileOps
 
 sealed abstract class InputMethod {
-  def isSbt: Boolean = filename.endsWith(".sbt")
-  def isSc: Boolean = filename.endsWith(".sc")
   def readInput(options: CliOptions): String
   def filename: String
-  def write(formatted: String, original: String, options: CliOptions): Unit
+  def write(formatted: String, original: String, options: CliOptions): ExitCode
 }
 
 object InputMethod {
@@ -33,8 +31,9 @@ object InputMethod {
         code: String,
         original: String,
         options: CliOptions
-    ): Unit = {
+    ): ExitCode = {
       options.common.out.print(code)
+      ExitCode.Ok
     }
   }
   case class FileContents(file: AbsoluteFile) extends InputMethod {
@@ -45,26 +44,28 @@ object InputMethod {
         formatted: String,
         original: String,
         options: CliOptions
-    ): Unit = {
+    ): ExitCode = {
       val codeChanged = formatted != original
-      if (options.testing) {
-        if (codeChanged) {
-          throw MisformattedFile(
-            new File(filename),
-            unifiedDiff(
-              filename,
-              original,
-              formatted
-            )
-          )
-        }
-      } else if (options.inPlace) {
-        if (codeChanged) {
-          FileOps.writeFile(filename, formatted)(options.encoding)
-        }
-      } else {
+      if (options.writeMode == WriteMode.Stdout)
         options.common.out.print(formatted)
-      }
+      else if (codeChanged)
+        options.writeMode match {
+          case WriteMode.Test =>
+            throw MisformattedFile(
+              new File(filename),
+              unifiedDiff(filename, original, formatted)
+            )
+          case WriteMode.Override =>
+            FileOps.writeFile(filename, formatted)(options.encoding)
+          case WriteMode.List =>
+            options.common.out.println(
+              options.common.workingDirectory.jfile
+                .toURI()
+                .relativize(file.jfile.toURI())
+            )
+          case _ =>
+        }
+      if (options.error && codeChanged) ExitCode.TestError else ExitCode.Ok
     }
   }
 
@@ -73,10 +74,9 @@ object InputMethod {
       original: String,
       revised: String
   ): String = {
-    import collection.JavaConverters._
+    import org.scalafmt.CompatCollections.JavaConverters._
     def jList(string: String) =
-      // Predef.augmentString = work around scala/bug#11125 on JDK 11
-      java.util.Collections.list(augmentString(string).lines.asJavaEnumeration)
+      java.util.Collections.list(string.linesIterator.asJavaEnumeration)
     val a = jList(original)
     val b = jList(revised)
     val diff = difflib.DiffUtils.diff(a, b)

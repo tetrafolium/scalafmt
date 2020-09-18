@@ -39,7 +39,7 @@ object Terminal {
       None
 
   implicit class Ansi(val output: Writer) extends AnyVal {
-    private def control(n: Int, c: Char) = output.write(s"\033[" + n + c)
+    private def control(n: Int, c: Char) = output.write("\u001b[" + n + c)
 
     /**
       * Move up `n` squares
@@ -169,7 +169,8 @@ object TermDisplay {
             s"Last update: ${formatTimestamp(remote)}"
           case (None, None) =>
             "" // ???
-        } else
+        }
+      else
         currentTimeOpt match {
           case Some(current) =>
             s"Checking for updates since ${formatTimestamp(current)}"
@@ -290,7 +291,9 @@ object TermDisplay {
 
           val extra0 =
             if (extra.length > baseExtraWidth)
-              extra.take((baseExtraWidth max (extra.length - overflow)) - 1) + "…"
+              extra.take(
+                (baseExtraWidth max (extra.length - overflow)) - 1
+              ) + "…"
             else
               extra
 
@@ -340,9 +343,7 @@ object TermDisplay {
             doneQueue.clear()
 
             val dw = downloads.toVector
-              .map { url =>
-                url -> infos.get(url)
-              }
+              .map { url => url -> infos.get(url) }
               .sortBy { case (_, info) => -info.fraction.sum }
 
             (q, dw)
@@ -396,9 +397,7 @@ object TermDisplay {
         case Some(Message.Update) =>
           val downloads0 = downloads.synchronized {
             downloads.toVector
-              .map { url =>
-                url -> infos.get(url)
-              }
+              .map { url => url -> infos.get(url) }
               .sortBy { case (_, info) => -info.fraction.sum }
           }
 

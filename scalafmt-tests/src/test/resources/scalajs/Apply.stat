@@ -10,6 +10,8 @@ function(
     b
 )
 <<< penalty #248
+optIn.breakChainOnFirstMethodDot = false
+===
      def iterator(): Iterator[A] =
       toIterator(it
             .asInstanceOf[IteratorMethodAccess]
@@ -34,8 +36,8 @@ def iterator(): Iterator[A] =
 {
   apply(body = js.undefined, dir = js.undefined,
       it.asInstanceOf[IteratorMethodAccess]
-        .bracketCall[JSIterator[A]](iteratorSymbol)(),
-      icon = js.undefined, lang = js.undefined, vibrate = js.undefined)
+        .bracketCall[JSIterator[A]](iteratorSymbol)(), icon = js.undefined,
+      lang = js.undefined, vibrate = js.undefined)
 }
 <<< many args #248
 apply( body= js.undefined,

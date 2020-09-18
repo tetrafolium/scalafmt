@@ -1,9 +1,14 @@
 package org.scalafmt.rewrite
 
-import org.scalafmt.util.{TokenOps, Whitespace}
+import org.scalafmt.util.Whitespace
 
 import scala.meta.tokens.Tokens
-import scala.meta.{Tree, _}
+import scala.meta._
+
+object PreferCurlyFors extends Rewrite {
+  override def create(implicit ctx: RewriteCtx): RewriteSession =
+    new PreferCurlyFors
+}
 
 /**
   * Replaces multi generator For / ForYield Expression parens and semi-colons
@@ -19,57 +24,50 @@ import scala.meta.{Tree, _}
   *     a <- as
   *     b <- bs if b > 2
   *   } yield (a, b)
-  *
   */
-case object PreferCurlyFors extends Rewrite {
+class PreferCurlyFors(implicit ctx: RewriteCtx) extends RewriteSession {
 
-  def findForParens(
-      forTokens: Tokens,
-      ctx: RewriteCtx
-  ): Option[(Token, Token)] = {
-    import ctx.tokenTraverser._
+  import ctx.dialect
+  import ctx.tokenTraverser._
 
+  private def findForParens(forTokens: Tokens): Option[(Token, Token)] =
     for {
       forToken <- forTokens.find(_.is[Token.KwFor])
-      leftParen <- find(forToken)(_.isNot[Whitespace])
-        .filter(_.is[Token.LeftParen])
-      rightParen <- ctx.matchingParens.get(TokenOps.hash(leftParen))
+      leftParen <- findAfter(forToken) {
+        case _: Token.LeftParen => Some(true)
+        case Whitespace() => None
+        case _ => Some(false)
+      }
+      rightParen <- ctx.getMatchingOpt(leftParen)
     } yield (leftParen, rightParen)
-  }
 
-  def findForSemiColons(
-      forEnumerators: Seq[Enumerator],
-      ctx: RewriteCtx
-  ): Seq[Token] = {
-    import ctx.tokenTraverser._
-
+  private def findForSemiColons(forEnumerators: Seq[Enumerator]): Seq[Token] =
     for {
       enumerator <- forEnumerators
-      token <- enumerator
-        .tokens(ctx.style.runner.dialect)
-        .headOption
-        .toIterable
-      semicolon <- reverseFind(token)(_.isNot[Whitespace])
-        .filter(_.is[Token.Semicolon])
-        .toIterable
+      token <-
+        enumerator
+          .tokens(ctx.style.runner.dialect)
+          .headOption
+          .toIterable
+      semicolon <- findBefore(token) {
+        case _: Token.Semicolon => Some(true)
+        case Whitespace() => None
+        case _ => Some(false)
+      }.toIterable
     } yield semicolon
-  }
 
-  def rewriteFor(
+  private def rewriteFor(
       forTokens: Tokens,
-      forEnumerators: Seq[Enumerator],
-      ctx: RewriteCtx
-  ): Seq[Patch] = {
-    import ctx.tokenTraverser._
+      forEnumerators: Seq[Enumerator]
+  ): Seq[TokenPatch] = {
+    val builder = Seq.newBuilder[TokenPatch]
 
-    val builder = Seq.newBuilder[Patch]
-
-    findForParens(forTokens, ctx).foreach { parens =>
+    findForParens(forTokens).foreach { parens =>
       val openBraceTokens =
         if (nextToken(parens._1).is[Token.LF]) "{" else "{\n"
       builder += TokenPatch.AddRight(parens._1, openBraceTokens)
       builder += TokenPatch.AddRight(parens._2, "}")
-      findForSemiColons(forEnumerators, ctx).foreach { semiColon =>
+      findForSemiColons(forEnumerators).foreach { semiColon =>
         val semiColonReplacementTokens =
           if (nextToken(semiColon).is[Token.LF]) "" else "\n"
         builder += TokenPatch.AddRight(semiColon, semiColonReplacementTokens)
@@ -79,18 +77,18 @@ case object PreferCurlyFors extends Rewrite {
     builder.result()
   }
 
-  def hasMoreThanOneGenerator(forEnumerators: Seq[Enumerator]): Boolean =
+  private def hasMoreThanOneGenerator(
+      forEnumerators: Seq[Enumerator]
+  ): Boolean =
     forEnumerators.count(_.is[Enumerator.Generator]) > 1
 
-  override def rewrite(code: Tree, ctx: RewriteCtx): Seq[Patch] = {
-    val builder = Seq.newBuilder[Patch]
-    import ctx.dialect
-    code.collect {
+  override def rewrite(tree: Tree): Unit =
+    tree match {
       case fy: Term.ForYield if hasMoreThanOneGenerator(fy.enums) =>
-        builder ++= rewriteFor(fy.tokens, fy.enums, ctx)
+        ctx.addPatchSet(rewriteFor(fy.tokens, fy.enums): _*)
       case f: Term.For if hasMoreThanOneGenerator(f.enums) =>
-        builder ++= rewriteFor(f.tokens, f.enums, ctx)
+        ctx.addPatchSet(rewriteFor(f.tokens, f.enums): _*)
+      case _ =>
     }
-    builder.result()
-  }
+
 }

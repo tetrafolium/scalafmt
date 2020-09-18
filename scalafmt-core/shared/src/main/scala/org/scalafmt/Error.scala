@@ -2,15 +2,16 @@ package org.scalafmt
 
 import scala.meta.Case
 import scala.meta.Tree
-import scala.meta.tokens.Token
 import scala.reflect.ClassTag
 import scala.reflect.classTag
 import java.io.File
 import scala.meta.inputs.Position
 import org.scalafmt.internal.Decision
+import org.scalafmt.internal.FormatToken
 import org.scalafmt.internal.State
 import org.scalafmt.util.LoggerOps
 import scala.meta.internal.inputs._
+import scala.util.control.NoStackTrace
 
 sealed abstract class Error(msg: String) extends Exception(msg)
 
@@ -42,12 +43,12 @@ object Error {
 
   case class FormatterChangedAST(diff: String, output: String)
       extends Error(s"""Formatter changed AST
-                       |=====================
-                       |$diff
-                       |=====================
-                       |${output.linesIterator.toVector.take(10).mkString("\n")}
-                       |=====================
-                       |Formatter changed AST
+        |=====================
+        |$diff
+        |=====================
+        |${output.linesIterator.toVector.take(10).mkString("\n")}
+        |=====================
+        |Formatter changed AST
       """.stripMargin)
 
   case class FormatterOutputDoesNotParse(msg: String, line: Int)
@@ -55,7 +56,7 @@ object Error {
 
   case class UnexpectedTree[Expected <: Tree: ClassTag](obtained: Tree)
       extends Error(s"""Expected: ${classTag[Expected].runtimeClass.getClass}
-                       |Obtained: ${log(obtained)}""".stripMargin)
+        |Obtained: ${log(obtained)}""".stripMargin)
 
   case class CantFormatFile(msg: String)
       extends Error("scalafmt cannot format this file:\n" + msg)
@@ -75,11 +76,13 @@ object Error {
   case class SearchStateExploded(
       deepestState: State,
       partialOutput: String,
-      lastToken: Token
-  ) extends Error(
-        s"Search state exploded around line ${lastToken.pos.endLine}"
-      ) {
-    def line: Int = lastToken.pos.endLine
+      ft: FormatToken
+  ) extends Error({
+        val tok = LoggerOps.log2(ft)
+        val line = ft.left.pos.endLine
+        s"Search state exploded on '$tok', line $line"
+      }) {
+    def line: Int = ft.left.pos.endLine
   }
 
   case class InvalidScalafmtConfiguration(throwable: Throwable)
@@ -90,6 +93,7 @@ object Error {
         "No files formatted/tested. " +
           "Verify include/exclude filters and command line arguments."
       )
+      with NoStackTrace
 
   case class InvalidOption(option: String)
       extends Error(s"Invalid option $option")

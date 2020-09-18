@@ -1,5 +1,5 @@
 unindentTopLevelOperators = true
-indentOperator = spray
+indentOperator.preset = spray
 <<< Indent operators
 object TestRoutes {
   def routes = {
@@ -116,6 +116,16 @@ val x =
   1 +
   2 +
   3
+<<< #848 1
+  val x =
+  1 &&
+  2 &&
+  3
+>>>
+val x =
+  1 &&
+  2 &&
+  3
 <<< #848 Test 2
   val x = 1 +
   2 +
@@ -131,9 +141,9 @@ val x = a + B(
 )
 >>>
 val x = a + B(
-    a,
-    2
-  )
+  a,
+  2
+)
 <<< #1223 assignment + right-associative
 val x = a :: B(
     a,
@@ -141,9 +151,9 @@ val x = a :: B(
 )
 >>>
 val x = a :: B(
-    a,
-    2
-  )
+  a,
+  2
+)
 <<< #1282
 val x = 1 + 2 +
   3

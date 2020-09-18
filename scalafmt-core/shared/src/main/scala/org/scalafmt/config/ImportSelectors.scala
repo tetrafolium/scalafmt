@@ -1,6 +1,5 @@
 package org.scalafmt.config
 
-import metaconfig.Configured.Ok
 import metaconfig._
 
 /**
@@ -39,9 +38,10 @@ import metaconfig._
   *   // max columns     |
   *   import org.{Aaaa, Bbbb, C, D, Eeee}
   * }}}
-  *
   */
-sealed abstract class ImportSelectors
+sealed abstract class ImportSelectors extends Decodable[ImportSelectors] {
+  override protected[config] def baseDecoder = ImportSelectors.reader
+}
 
 object ImportSelectors {
 
@@ -58,12 +58,10 @@ object ImportSelectors {
   // limitations in the current version of scalameta/paradise, but these will
   // likely be fixed in the future, at which point this reader could be moved
   // to ScalafmtConfig
-  implicit val backwardsCompatibleReader: ConfDecoder[ImportSelectors] =
-    ConfDecoder.instance[ImportSelectors] {
-      case Conf.Bool(true) => Ok(ImportSelectors.binPack)
-      case Conf.Bool(false) => Ok(ImportSelectors.noBinPack)
-      case els => reader.read(els)
-    }
+  implicit val preset: PartialFunction[Conf, ImportSelectors] = {
+    case Conf.Bool(true) => ImportSelectors.binPack
+    case Conf.Bool(false) => ImportSelectors.noBinPack
+  }
 
   case object noBinPack extends ImportSelectors
   case object binPack extends ImportSelectors

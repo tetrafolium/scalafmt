@@ -1,17 +1,15 @@
 package org.scalafmt.dynamic
 
+import com.typesafe.config.ConfigFactory
 import java.net.URLClassLoader
-import java.nio.charset.StandardCharsets
-import java.nio.file.{Files, Path}
-
+import java.nio.file.Path
 import org.scalafmt.dynamic.exceptions._
 import org.scalafmt.dynamic.utils.ReflectUtils._
-
 import scala.util.Try
 
 case class ScalafmtReflect(
     classLoader: URLClassLoader,
-    version: String,
+    version: ScalafmtVersion,
     respectVersion: Boolean
 ) {
   import classLoader.loadClass
@@ -52,7 +50,7 @@ case class ScalafmtReflect(
 
   // TODO: see implementation details for other versions of scalafmt, find where intellij config is kept
   lazy val intellijScalaFmtConfig: Option[ScalafmtReflectConfig] = {
-    if (version == "1.5.1") {
+    if (version == ScalafmtVersion(1, 5, 1)) {
       val scalaFmtConfigCls =
         classLoader.loadClass("org.scalafmt.config.ScalafmtConfig")
       val configTarget = scalaFmtConfigCls.invokeStatic("intellij")
@@ -63,31 +61,35 @@ case class ScalafmtReflect(
   }
 
   def parseConfig(configPath: Path): ScalafmtReflectConfig = {
-    val configBytes = Files.readAllBytes(configPath)
-    val configText = new String(configBytes, StandardCharsets.UTF_8)
-    parseConfigFromString(configText)
-  }
-
-  def parseConfigFromString(configText: String): ScalafmtReflectConfig = {
-    val configured: Object = try { // scalafmt >= 1.6.0
-      scalafmtCls.invokeStatic("parseHoconConfig", configText.asParam)
-    } catch {
-      case _: NoSuchMethodException =>
-        // scalafmt >= v0.7.0-RC1 && scalafmt < 1.6.0
-        val fromHoconEmptyPath =
-          configCls.invokeStatic("fromHoconString$default$2")
-        configCls.invokeStatic(
-          "fromHoconString",
-          configText.asParam,
-          fromHoconEmptyPath.asParam(optionCls)
-        )
-    }
+    val configText = ConfigFactory.parseFile(configPath.toFile).root.render()
+    val configured: Object =
+      try { // scalafmt >= 1.6.0
+        scalafmtCls.invokeStatic("parseHoconConfig", configText.asParam)
+      } catch {
+        case _: NoSuchMethodException =>
+          // scalafmt >= v0.7.0-RC1 && scalafmt < 1.6.0
+          val fromHoconEmptyPath =
+            configCls.invokeStatic("fromHoconString$default$2")
+          configCls.invokeStatic(
+            "fromHoconString",
+            configText.asParam,
+            fromHoconEmptyPath.asParam(optionCls)
+          )
+        case ReflectionException(e) =>
+          throw new ScalafmtDynamicError.ConfigParseError(
+            configPath,
+            e.getMessage
+          )
+      }
 
     try {
       new ScalafmtReflectConfig(this, configured.invoke("get"), classLoader)
     } catch {
       case ReflectionException(e) =>
-        throw ScalafmtConfigException(e.getMessage)
+        throw new ScalafmtDynamicError.ConfigParseError(
+          configPath,
+          e.getMessage
+        )
     }
   }
 
@@ -96,6 +98,7 @@ case class ScalafmtReflect(
       config: ScalafmtReflectConfig,
       fileOpt: Option[Path] = None
   ): String = {
+    require(this eq config.fmtReflect)
     checkVersionMismatch(config)
 
     val formatted = (formatMethodWithFilename, fileOpt) match {
@@ -160,9 +163,10 @@ case class ScalafmtReflect(
 
   private def checkVersionMismatch(config: ScalafmtReflectConfig): Unit = {
     if (respectVersion) {
+      val expected = version.toString
       val obtained = config.version
-      if (obtained != version) {
-        throw VersionMismatch(obtained, version)
+      if (obtained != expected) {
+        throw VersionMismatch(obtained, expected)
       }
     }
   }

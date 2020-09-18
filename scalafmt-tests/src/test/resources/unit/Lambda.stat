@@ -69,14 +69,14 @@ Thing(implicit ctx => j => ???)
 <<< long curried with ()
 Thing(implicit ctx => j => k => aaaaaaaaaaaaa(bbbbbbbbbbbbbbbbbbb, cccccccccc, ddddddddddddddddddddj)) // coooooooooooooooomment
 >>>
-Thing(
-    implicit ctx =>
-      j =>
-        k =>
-          aaaaaaaaaaaaa(
-              bbbbbbbbbbbbbbbbbbb,
-              cccccccccc,
-              ddddddddddddddddddddj)) // coooooooooooooooomment
+Thing(implicit ctx =>
+  j =>
+    k =>
+      aaaaaaaaaaaaa(
+          bbbbbbbbbbbbbbbbbbb,
+          cccccccccc,
+          ddddddddddddddddddddj
+      )) // coooooooooooooooomment
 <<< single line uncurried
 Thing() { implicit ctx =>
       ???
@@ -90,11 +90,10 @@ val groupedData = Array(topic1, topic2).flatMap(
         topic =>
           partitionDataFetchResponseMap.map(foobar))
 >>>
-val groupedData =
-  Array(topic1, topic2).flatMap(
-      topic =>
-        partitionDataFetchResponseMap
-          .map(foobar))
+val groupedData = Array(topic1, topic2)
+  .flatMap(topic =>
+    partitionDataFetchResponseMap.map(
+        foobar))
 <<< 1.8 upgrade
 val x: Int => Int =  { y =>
   y + 1
@@ -140,11 +139,196 @@ classTag[K] match {
 call(1) { x =>
 }
 >>>
-call(1) { x =>
-}
+call(1) { x => }
 <<< #1171 comment
 call(1) { x => // nothing
 }
 >>>
 call(1) { x => // nothing
+}
+<<< #2099 beforeCurlyLambdaParams = false
+newlines.beforeCurlyLambdaParams = false
+===
+object a {
+  x.map { x => s"${x._1} -> ${x._2}" }
+  x.map(x => s"${x._1} -> ${x._2}")
+  x.map { case (c, i) => s"$c -> $i" }
+  x.zipWithIndex.map { x => s"${x._1} -> ${x._2}" }
+  x.zipWithIndex.map(x => s"${x._1} -> ${x._2}")
+  x.zipWithIndex.map { case (c, i) => s"$c -> $i" }
+  x.zipWithIndex.map { case (c, i) => s"$c -> $i (long comment)" }
+  x.zipWithIndex.map { case (c, i) if c != i => s"$c -> $i" }
+  x.flatMap(result => for {
+      _ <- a
+      _ <- b
+    } yield ()
+  )
+}
+>>>
+object a {
+  x.map { x => s"${x._1} -> ${x._2}" }
+  x.map(x => s"${x._1} -> ${x._2}")
+  x.map { case (c, i) => s"$c -> $i" }
+  x.zipWithIndex.map { x =>
+    s"${x._1} -> ${x._2}"
+  }
+  x.zipWithIndex.map(x =>
+    s"${x._1} -> ${x._2}")
+  x.zipWithIndex.map { case (c, i) =>
+    s"$c -> $i"
+  }
+  x.zipWithIndex.map { case (c, i) =>
+    s"$c -> $i (long comment)"
+  }
+  x.zipWithIndex.map {
+    case (c, i) if c != i =>
+      s"$c -> $i"
+  }
+  x.flatMap(result =>
+    for {
+      _ <- a
+      _ <- b
+    } yield ())
+}
+<<< #2099 beforeCurlyLambdaParams = true
+newlines.beforeCurlyLambdaParams = true
+===
+object a {
+  x.map { x => s"${x._1} -> ${x._2}" }
+  x.map(x => s"${x._1} -> ${x._2}")
+  x.map { case (c, i) => s"$c -> $i" }
+  x.zipWithIndex.map { x => s"${x._1} -> ${x._2}" }
+  x.zipWithIndex.map(x => s"${x._1} -> ${x._2}")
+  x.zipWithIndex.map { case (c, i) => s"$c -> $i" }
+  x.zipWithIndex.map { case (c, i) => s"$c -> $i (long comment)" }
+  x.zipWithIndex.map { case (c, i) if c != i => s"$c -> $i" }
+  x.flatMap(result => for {
+      _ <- a
+      _ <- b
+    } yield ()
+  )
+}
+>>>
+object a {
+  x.map {
+    x => s"${x._1} -> ${x._2}"
+  }
+  x.map(
+      x => s"${x._1} -> ${x._2}")
+  x.map {
+    case (c, i) => s"$c -> $i"
+  }
+  x.zipWithIndex.map {
+    x => s"${x._1} -> ${x._2}"
+  }
+  x.zipWithIndex.map(
+      x => s"${x._1} -> ${x._2}")
+  x.zipWithIndex.map {
+    case (c, i) => s"$c -> $i"
+  }
+  x.zipWithIndex.map {
+    case (c, i) =>
+      s"$c -> $i (long comment)"
+  }
+  x.zipWithIndex.map {
+    case (c, i) if c != i =>
+      s"$c -> $i"
+  }
+  x.flatMap(
+      result =>
+        for {
+          _ <- a
+          _ <- b
+        } yield ())
+}
+<<< #2099 beforeCurlyLambdaParams = multilineWithCaseOnly
+newlines.beforeCurlyLambdaParams = multilineWithCaseOnly
+===
+object a {
+  x.map { x => s"${x._1} -> ${x._2}" }
+  x.map(x => s"${x._1} -> ${x._2}")
+  x.map { case (c, i) => s"$c -> $i" }
+  x.zipWithIndex.map { x => s"${x._1} -> ${x._2}" }
+  x.zipWithIndex.map(x => s"${x._1} -> ${x._2}")
+  x.zipWithIndex.map { case (c, i) => s"$c -> $i" }
+  x.zipWithIndex.map { case (c, i) => s"$c -> $i (long comment)" }
+  x.zipWithIndex.map { case (c, i) if c != i => s"$c -> $i" }
+  x.flatMap(result => for {
+      _ <- a
+      _ <- b
+    } yield ()
+  )
+}
+>>>
+object a {
+  x.map { x => s"${x._1} -> ${x._2}" }
+  x.map(x => s"${x._1} -> ${x._2}")
+  x.map { case (c, i) => s"$c -> $i" }
+  x.zipWithIndex.map { x =>
+    s"${x._1} -> ${x._2}"
+  }
+  x.zipWithIndex.map(x =>
+    s"${x._1} -> ${x._2}")
+  x.zipWithIndex.map {
+    case (c, i) => s"$c -> $i"
+  }
+  x.zipWithIndex.map {
+    case (c, i) =>
+      s"$c -> $i (long comment)"
+  }
+  x.zipWithIndex.map {
+    case (c, i) if c != i =>
+      s"$c -> $i"
+  }
+  x.flatMap(result =>
+    for {
+      _ <- a
+      _ <- b
+    } yield ())
+}
+<<< #2099 beforeCurlyLambdaParams = multiline
+newlines.beforeCurlyLambdaParams = multiline
+===
+object a {
+  x.map { x => s"${x._1} -> ${x._2}" }
+  x.map(x => s"${x._1} -> ${x._2}")
+  x.map { case (c, i) => s"$c -> $i" }
+  x.zipWithIndex.map { x => s"${x._1} -> ${x._2}" }
+  x.zipWithIndex.map(x => s"${x._1} -> ${x._2}")
+  x.zipWithIndex.map { case (c, i) => s"$c -> $i" }
+  x.zipWithIndex.map { case (c, i) => s"$c -> $i (long comment)" }
+  x.zipWithIndex.map { case (c, i) if c != i => s"$c -> $i" }
+  x.flatMap(result => for {
+      _ <- a
+      _ <- b
+    } yield ()
+  )
+}
+>>>
+object a {
+  x.map { x => s"${x._1} -> ${x._2}" }
+  x.map(x => s"${x._1} -> ${x._2}")
+  x.map { case (c, i) => s"$c -> $i" }
+  x.zipWithIndex.map {
+    x => s"${x._1} -> ${x._2}"
+  }
+  x.zipWithIndex.map(
+      x => s"${x._1} -> ${x._2}")
+  x.zipWithIndex.map {
+    case (c, i) => s"$c -> $i"
+  }
+  x.zipWithIndex.map {
+    case (c, i) =>
+      s"$c -> $i (long comment)"
+  }
+  x.zipWithIndex.map {
+    case (c, i) if c != i =>
+      s"$c -> $i"
+  }
+  x.flatMap(
+      result =>
+        for {
+          _ <- a
+          _ <- b
+        } yield ())
 }

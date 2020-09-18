@@ -4,7 +4,6 @@ import metaconfig._
 import metaconfig.generic.Surface
 
 /**
-  *
   * @param openParenCallSite
   *   If true AND bin-packing is true, then call-site
   *   arguments won't be aligned by the opening
@@ -29,7 +28,7 @@ import metaconfig.generic.Surface
   *
   *               Pro tip. if you use for example
   *
-  *               style = defaultWithAlign
+  *               preset = defaultWithAlign
   *
   *               and want to add one extra token (for example "|>") to align by, write
   *
@@ -38,7 +37,7 @@ import metaconfig.generic.Surface
   *               NOTE. Adding more alignment tokens may potentially decrease the
   *               vertical alignment in formatted output. Customize at your own
   *               risk, I recommend you try and stick to the default settings.
-  * @param arrowEnumeratorGenerator If true, aligns by <- in for comprehensions.
+  * @param arrowEnumeratorGenerator If true, aligns by `<-` in for comprehensions.
   * @param ifWhileOpenParen
   *   If true, aligns by ( in if/while/for. If false,
   *   indents by continuation indent at call site.
@@ -54,13 +53,20 @@ import metaconfig.generic.Surface
   *   Defn.Var, set the values to:
   *     Map("Defn.Var" -> "Assign", "Defn.Val" -> "Assign")
   *   Note. Requires mixedOwners to be true.
+  * @param stripMargin
+  *   If set, indent lines with a strip-margin character in a multiline string
+  *   constant relative to the opening quotes (or the strip-margin character if
+  *   present) on the first line; otherwise, indent relative to the beginning
+  *   of the first line, as usual.
   */
 case class Align(
+    multiline: Boolean = false,
+    stripMargin: Boolean = true,
     openParenCallSite: Boolean = false,
     openParenDefnSite: Boolean = false,
-    tokens: Set[AlignToken] = Set(AlignToken.caseArrow),
+    tokens: Seq[AlignToken] = Seq(AlignToken.caseArrow),
     arrowEnumeratorGenerator: Boolean = false,
-    ifWhileOpenParen: Boolean = true,
+    ifWhileOpenParen: Boolean = false,
     tokenCategory: Map[String, String] = Map(),
     treeCategory: Map[String, String] = Map(
       "Defn.Val" -> "val/var/def",
@@ -72,19 +78,21 @@ case class Align(
       "Enumerator.Generator" -> "for",
       "Enumerator.Val" -> "for"
     )
-) {
-  implicit val reader: ConfDecoder[Align] = generic.deriveDecoder(this).noTypos
-  implicit val alignReader: ConfDecoder[Set[AlignToken]] =
-    ScalafmtConfig.alignTokenReader(tokens)
+) extends Decodable[Align] {
+  override protected[config] def baseDecoder =
+    generic.deriveDecoder(this).noTypos
+  implicit def alignReader: ConfDecoder[Seq[AlignToken]] =
+    Align.alignTokenReader(tokens)
 }
 
 object Align {
   // no vertical alignment whatsoever, if you find any vertical alignment with
   // this settings, please report an issue.
   val none: Align = Align(
+    stripMargin = false,
     openParenCallSite = false,
     openParenDefnSite = false,
-    tokens = Set.empty,
+    tokens = Seq.empty,
     ifWhileOpenParen = false,
     tokenCategory = Map.empty,
     treeCategory = Map.empty
@@ -95,19 +103,11 @@ object Align {
   val more: Align = some.copy(tokens = AlignToken.default)
   implicit lazy val surface: Surface[Align] = generic.deriveSurface[Align]
   implicit lazy val encoder: ConfEncoder[Align] = generic.deriveEncoder
-  // TODO: metaconfig should handle iterables
-  implicit def encoderSet[T: ConfEncoder]: ConfEncoder[Set[T]] =
-    implicitly[ConfEncoder[Seq[T]]].contramap(_.toSeq)
-  implicit val mapEncoder: ConfEncoder[Map[String, String]] =
-    ConfEncoder.instance[Map[String, String]] { m =>
-      Conf.Obj(m.iterator.map {
-        case (k, v) => k -> Conf.fromString(v)
-      }.toList)
-    }
 
   // only for the truest vertical aligners, this setting is open for changes,
   // please open PR addding more stuff to it if you like.
   val most: Align = more.copy(
+    multiline = true,
     arrowEnumeratorGenerator = true,
     tokenCategory = Map(
       "Equals" -> "Assign",
@@ -116,12 +116,21 @@ object Align {
   )
   val allValues = List(default, none, some, most)
 
-  object Builtin {
-    def unapply(conf: Conf): Option[Align] = Option(conf).collect {
-      case Conf.Str("none") | Conf.Bool(false) => Align.none
-      case Conf.Str("some" | "default") => Align.some
-      case Conf.Str("more") | Conf.Bool(true) => Align.more
-      case Conf.Str("most") => Align.most
+  implicit val preset: PartialFunction[Conf, Align] = {
+    case Conf.Str("none") | Conf.Bool(false) => Align.none
+    case Conf.Str("some" | "default") => Align.some
+    case Conf.Str("more") | Conf.Bool(true) => Align.more
+    case Conf.Str("most") => Align.most
+  }
+
+  def alignTokenReader(
+      initTokens: Seq[AlignToken]
+  ): ConfDecoder[Seq[AlignToken]] = {
+    val base = ConfDecoder[Seq[AlignToken]]
+    ConfDecoder.instance[Seq[AlignToken]] {
+      case Conf.Obj(("add", c) :: Nil) => base.read(c).map(initTokens ++ _)
+      case c => preset.lift(c).fold(base.read(c))(x => Configured.ok(x.tokens))
     }
   }
+
 }

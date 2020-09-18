@@ -1,16 +1,17 @@
 package org.scalafmt.util
 
-import scala.io.Codec
 import java.io._
-import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.Paths
+import java.nio.file.{Files, LinkOption, Path, Paths}
+import scala.io.Codec
 
 object FileOps {
 
   def makeAbsolute(workingDir: File)(file: File): File =
     if (file.isAbsolute) file
     else new File(workingDir, file.getPath)
+
+  def isRegularFile(file: File): Boolean =
+    Files.isRegularFile(file.toPath, LinkOption.NOFOLLOW_LINKS)
 
   def listFiles(path: String): Vector[String] = {
     listFiles(new File(path))
@@ -61,8 +62,8 @@ object FileOps {
     new File(path.mkString(File.separator))
   }
 
-  def writeFile(file: AbsoluteFile, content: String)(
-      implicit codec: Codec
+  def writeFile(file: AbsoluteFile, content: String)(implicit
+      codec: Codec
   ): Unit = {
     writeFile(file.jfile, content)
   }
@@ -76,9 +77,16 @@ object FileOps {
     Files.write(path, bytes)
   }
 
-  def writeFile(filename: String, content: String)(
-      implicit codec: Codec
+  def writeFile(filename: String, content: String)(implicit
+      codec: Codec
   ): Unit = {
     writeFile(Paths.get(filename), content)
   }
+
+  @inline
+  def isAmmonite(filename: String): Boolean = filename.endsWith(".sc")
+
+  @inline
+  def isSbt(filename: String): Boolean = filename.endsWith(".sbt")
+
 }

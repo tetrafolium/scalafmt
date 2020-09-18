@@ -105,6 +105,31 @@ val spaceCouldBeOk =
     }
   }
 }
+<<< space ok 2
+newlines.afterInfix = some
+indentOperator.preset = akka
+===
+{{{{{
+val spaceCouldBeOk =
+          oldNewlines == 0 && !left.isInstanceOf[Comment] &&
+          right.isInstanceOf[Keyword] &&
+          isSingleIdentifierAnnotation(prev(tok))
+          }}}}}
+>>>
+{
+  {
+    {
+      {
+        {
+          val spaceCouldBeOk =
+            oldNewlines == 0 && !left.isInstanceOf[Comment] &&
+              right.isInstanceOf[Keyword] &&
+              isSingleIdentifierAnnotation(prev(tok))
+        }
+      }
+    }
+  }
+}
 <<< penalty &&
 {{
    def rhsIsCommentedOut(formatToken: FormatToken): Boolean =
@@ -219,7 +244,9 @@ val _areTypedArraysSupported = {
 >>>
 if (other == null) {
   throw new NullPointerException()
-} else if (toffset < 0 || ooffset < 0 || toffset + len > thiz.length || ooffset + len > other.length) {
+} else if (
+    toffset < 0 || ooffset < 0 || toffset + len > thiz.length || ooffset + len > other.length
+) {
   false
 } else if (len <= 0) {
   true
@@ -237,17 +264,15 @@ if (other == null) {
 >>>
 {
   {
-    phrase(a ^^ {
-      case p1 =>
-        Rowset(
-            p1.toSeq map {
-              fromXML[eveapi.xml.char.ContactList.Row](_,
-                                                       scalaxb.ElemName(node))
-            },
-            ListMap(
-                List(
-                    (node \ "@name").headOption.map(x => DataRecord())
-                ).flatten: _*))
+    phrase(a ^^ { case p1 =>
+      Rowset(
+          p1.toSeq map {
+            fromXML[eveapi.xml.char.ContactList.Row](_, scalaxb.ElemName(node))
+          },
+          ListMap(
+              List(
+                  (node \ "@name").headOption.map(x => DataRecord())
+              ).flatten: _*))
     })
   }
 }
@@ -271,8 +296,8 @@ object ExternForwarder {
     case DefDef()
         if isExternModule(from.symbol)
           && params.length == args.length
-          && params.zip(args).forall {
-            case _ => false
+          && params.zip(args).forall { case _ =>
+            false
           } =>
       Some(sel.symbol)
     case _ =>
@@ -283,13 +308,14 @@ object ExternForwarder {
 1 match {
  case accountIdStr :: userIdStr :: connectorIdStr :: timestampStr :: eventClassStr :: contactIdStr
         :: contactPointIdStr :: contactPointValue :: remoteContactId :: to :: subject :: remoteId
-        :: remoteGroupId :: timeZoneStr :: rest =>
+        :: remoteGroupId :: timeZoneStr :: rest if "some lengthy condition is not empty".nonEmpty =>
 }
 >>>
 1 match {
   case accountIdStr :: userIdStr :: connectorIdStr :: timestampStr :: eventClassStr :: contactIdStr
-        :: contactPointIdStr :: contactPointValue :: remoteContactId :: to :: subject :: remoteId
-        :: remoteGroupId :: timeZoneStr :: rest =>
+      :: contactPointIdStr :: contactPointValue :: remoteContactId :: to :: subject :: remoteId
+      :: remoteGroupId :: timeZoneStr :: rest
+      if "some lengthy condition is not empty".nonEmpty =>
 }
 <<< unfortunate side-effect of #740
 { lazy val propertyName =
@@ -300,7 +326,7 @@ object ExternForwarder {
 {
   lazy val propertyName =
     ("""[a-zA-Z_][a-zA-Z_0-9]*""".r | """`([^`\\]|\\.)+`""".r ^^ canonicalizePropertyName | """"([^"\\]|\\.)+"""".r ^^ canonicalizeStr //"
-  )
+    )
 }
 <<< #728
 lazy val ReleaseCmd = Command.command("release") { state =>
@@ -339,3 +365,128 @@ val overrides =
     "hostname" ::
     "port" ::
     Nil
+<<< #1608: apply with single too-long assign of infix
+{
+  Bbbbbbbbbbbbbbbbbbbbbbb(cccccccccccccccccc = dddddddd + eeeeeeee /* comment */)
+}
+>>>
+{
+  Bbbbbbbbbbbbbbbbbbbbbbb(cccccccccccccccccc =
+    dddddddd + eeeeeeee /* comment */ )
+}
+<<< #1608: while with infix
+object a {
+        while (isEmptyChar(ext.getContainingFile.getText.charAt(end - 1))) end = end - 1
+        }
+>>>
+object a {
+  while (isEmptyChar(ext.getContainingFile.getText.charAt(end - 1)))
+    end = end - 1
+}
+<<< #1604 1: apply with single too-long assign of trailing comment then infix
+{
+  Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb(ccccccccccccccccccccccccccccccccc = // comment
+  dddddddd + eeeeeeee /* comment */)
+}
+>>>
+{
+  Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb(
+      ccccccccccccccccccccccccccccccccc = // comment
+        dddddddd + eeeeeeee /* comment */ )
+}
+<<< #1604 2: apply with single a bit long assign of trailing comment then block
+{
+  Bbbbbbbbbbbbb(cccccccccccc = // comment
+{dddddddd + eeeeeeee  /* comment */ })
+}
+>>>
+{
+  Bbbbbbbbbbbbb(cccccccccccc = // comment
+    { dddddddd + eeeeeeee /* comment */ })
+}
+<<< #1604 3: apply with single a bit long assign of block with trailing comment
+{
+  Bbbbbbbbbbbbb(cccccccccccc = { // comment
+dddddddd + eeeeeeee /* comment */ })
+}
+>>>
+{
+  Bbbbbbbbbbbbb(cccccccccccc = { // comment
+    dddddddd + eeeeeeee /* comment */
+  })
+}
+<<< block followed by infix 1
+object a {
+    the[Exception] thrownBy { SizeUtils.calculate(segments, "user")
+    } should have message """Cannot resolve column name "user" among (segment_id);"""
+}
+>>>
+object a {
+  the[Exception] thrownBy {
+    SizeUtils.calculate(segments, "user")
+  } should have message """Cannot resolve column name "user" among (segment_id);"""
+}
+<<< block followed by infix 2
+object a {
+      opt[String]("env") action { (x, c) =>
+        c.copy(env = Some(x))
+      } text ("Comma-separated list of environmental variables (in 'FOO=BAR' " +
+         "format) to pass to the Spark execution environment.")
+}
+>>>
+object a {
+  opt[String]("env") action { (x, c) =>
+    c.copy(env = Some(x))
+  } text ("Comma-separated list of environmental variables (in 'FOO=BAR' " +
+    "format) to pass to the Spark execution environment.")
+}
+<<< infix followed by block, and then another statement (endOfSingleLineBlock)
+object a {
+      (1 to demand3.toInt) foreach { _ ⇒ pSub.sendNext(input.next()) }
+      ((demand1 + demand2 + 1).toInt to (demand1 + demand2 + demand3).toInt) foreach {
+        n ⇒ c.expectNext(n)
+      }
+}
+>>>
+object a {
+  (1 to demand3.toInt) foreach { _ ⇒ pSub.sendNext(input.next()) }
+  ((demand1 + demand2 + 1).toInt to (demand1 + demand2 + demand3).toInt) foreach {
+    n ⇒ c.expectNext(n)
+  }
+}
+<<< block followed by infix 3 (BestFirstSearch shouldn't give up)
+object a {
+    intercept[MappingException] {
+      ExpressionJsonSerializer.deserialize[Token](unknownJson)
+    }.getMessage shouldBe s"Invalid feature tag `unknown`, supported tags: " +
+      "tags..."
+}
+>>>
+object a {
+  intercept[MappingException] {
+    ExpressionJsonSerializer.deserialize[Token](unknownJson)
+  }.getMessage shouldBe s"Invalid feature tag `unknown`, supported tags: " +
+    "tags..."
+}
+<<< block deep into an infix expression 1
+object a {
+        (intercept[IllegalStateException] { t.failingJOptionPigdog }).getMessage should ===(
+          "expected")
+}
+>>>
+object a {
+  (intercept[IllegalStateException] {
+    t.failingJOptionPigdog
+  }).getMessage should ===("expected")
+}
+<<< block deep into an infix expression 2
+object a {
+           server.out1 ~> Flow[SslTlsOutbound]
+            .collect { case SendBytes(x) ⇒ x }
+             .buffer(1, OverflowStrategy.backpressure) ~> netOut.sink
+}
+>>>
+object a {
+  server.out1 ~> Flow[SslTlsOutbound].collect { case SendBytes(x) ⇒ x }
+    .buffer(1, OverflowStrategy.backpressure) ~> netOut.sink
+}

@@ -55,6 +55,8 @@ trait AllSyntax
     with EitherSyntax
     with EqSyntax
 <<< nested with
+newlines.topLevelStatements = [before]
+===
 trait Grouped[K, +V]
   extends KeyedListLike[K, V, UnsortedGrouped]
   with HashJoinable[K, V]
@@ -101,3 +103,18 @@ abstract class Quantity[A <: Quantity[A]]
     with Ordered[A] { self: A ⇒
   println(1)
 }
+<<< trait with multiple complex type params
+align.preset = none
+===
+ trait CounterLike[
+    K, V, +M <: scala.collection.mutable.Map[K, V], +This <: Counter[K, V]]
+     extends TensorLike[K, V, This]
+     with Serializable { }
+>>>
+trait CounterLike[
+    K,
+    V,
+    +M <: scala.collection.mutable.Map[K, V],
+    +This <: Counter[K, V]]
+    extends TensorLike[K, V, This]
+    with Serializable {}

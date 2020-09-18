@@ -1,4 +1,5 @@
 align.arrowEnumeratorGenerator = true
+maxColumn = 38
 <<< alignByArrowEnumeratorGenerator
 for {
   x <- new Integer {
@@ -9,8 +10,224 @@ for {
 >>>
 for {
   x <- new Integer {
-        def value = 2
-      }
+         def value = 2
+       }
   y <- Int(2)
 } yield x + y
-
+<<< split long lines, with breaks
+for {
+  variable <-
+    record.field.field1.map(_.toString)
+  cond <-
+    if (variable) doSomething
+    else doAnything
+} yield cond
+>>>
+for {
+  variable <-
+    record.field.field1.map(
+      _.toString
+    )
+  cond <-
+    if (variable) doSomething
+    else doAnything
+} yield cond
+<<< split long lines, without breaks
+for {
+  variable <- record.field.field1.map(_.toString)
+  cond <- if (variable) doSomething
+    else doAnything
+} yield cond
+>>>
+for {
+  variable <- record.field.field1.map(
+                _.toString
+              )
+  cond <- if (variable) doSomething
+          else doAnything
+} yield cond
+<<< insert newlines to for if no newlines origin
+for {
+  variable <- record.field.field1.map(_.toString)
+  cond <- if (variable) doSomething else doAnything
+} yield cond
+>>>
+for {
+  variable <- record.field.field1.map(
+                _.toString
+              )
+  cond <- if (variable) doSomething
+          else doAnything
+} yield cond
+<<< keep oneliners if they fits maxColumn
+for {
+  variable <- record.field
+  cond <- doSomething
+} yield cond
+>>>
+for {
+  variable <- record.field
+  cond <- doSomething
+} yield cond
+<<< insert newlines also for values
+for {
+  variable <- record.field.field1.map(_.toString)
+  cond = if (variable) doSomething else doAnything
+} yield cond
+>>>
+for {
+  variable <- record.field.field1.map(
+                _.toString
+              )
+  cond = if (variable) doSomething
+         else doAnything
+} yield cond
+<<< body in braces on right side
+for {
+  x <- { if (condition) doSomething else doOtherThing }
+} yield x
+>>>
+for {
+  x <- {
+    if (condition) doSomething
+    else doOtherThing
+  }
+} yield x
+<<< unicode
+for {
+  x ← new Integer {
+  def value = 2
+  }
+  y ← Int(2)
+  cond ← if (variable) doSomething else doAnything
+} yield x + y
+>>>
+for {
+  x ← new Integer {
+        def value = 2
+      }
+  y ← Int(2)
+  cond ← if (variable) doSomething
+         else doAnything
+} yield x + y
+<<< fold
+newlines.source=fold
+align.arrowEnumeratorGenerator = true
+===
+for {
+  x <- new Integer {
+  def value = 2
+  }
+  y <- Int(2)
+  cond <- if (variable) doSomething else doAnything
+} yield x + y
+>>>
+for {
+  x <- new Integer {
+         def value = 2
+       }
+  y <- Int(2)
+  cond <- if (variable) doSomething
+          else doAnything
+} yield x + y
+<<< keep
+newlines.source=keep
+align.arrowEnumeratorGenerator = true
+===
+for {
+  x <- new Integer {
+  def value = 2
+  }
+  y <- Int(2)
+  cond <- if (variable) doSomething else doAnything
+} yield x + y
+>>>
+for {
+  x <- new Integer {
+         def value = 2
+       }
+  y <- Int(2)
+  cond <- if (variable) doSomething
+          else doAnything
+} yield x + y
+<<< keep with break
+newlines.source=keep
+align.arrowEnumeratorGenerator = true
+===
+for {
+  cond <-
+  if (variable) doSomething
+  else doAnything
+} yield x + y
+>>>
+for {
+  cond <-
+    if (variable) doSomething
+    else doAnything
+} yield x + y
+<<< keep try without break
+newlines.source=keep
+align.arrowEnumeratorGenerator = true
+===
+for {
+  cond <- try { Some(x) } catch { case _ => None }
+  cond = try { Some(x) } catch { case _ => None }
+} yield x + y
+>>>
+for {
+  cond <- try { Some(x) }
+          catch { case _ => None }
+  cond = try { Some(x) }
+         catch { case _ => None }
+} yield x + y
+<<< keep try with break
+newlines.source=keep
+align.arrowEnumeratorGenerator = true
+===
+for {
+  cond <-
+    try { Some(x) } catch { case _ => None }
+  cond =
+    try { Some(x) } catch { case _ => None }
+} yield x + y
+>>>
+for {
+  cond <-
+    try { Some(x) }
+    catch { case _ => None }
+  cond =
+    try { Some(x) }
+    catch { case _ => None }
+} yield x + y
+<<< fold try without break
+newlines.source=fold
+align.arrowEnumeratorGenerator = true
+===
+for {
+  cond <- try { Some(x) } catch { case _ => None }
+  cond = try { Some(x) } catch { case _ => None }
+} yield x + y
+>>>
+for {
+  cond <- try { Some(x) }
+          catch { case _ => None }
+  cond = try { Some(x) }
+         catch { case _ => None }
+} yield x + y
+<<< fold try with break
+newlines.source=fold
+align.arrowEnumeratorGenerator = true
+===
+for {
+  cond <-
+    try { Some(x) } catch { case _ => None }
+  cond =
+    try { Some(x) } catch { case _ => None }
+} yield x + y
+>>>
+for {
+  cond <- try { Some(x) }
+          catch { case _ => None }
+  cond = try { Some(x) }
+         catch { case _ => None }
+} yield x + y

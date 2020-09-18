@@ -12,16 +12,20 @@ if (aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa &&
 bbbbbbbbbbbbbbbbbb)
   println("a")
 >>>
-if (aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa &&
-    bbbbbbbbbbbbbbbbbb)
+if (
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa &&
+    bbbbbbbbbbbbbbbbbb
+)
   println("a")
 <<< Long if condition with inline comment
 if (aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa &&
       bbbbbbbbbbbbbbbbbb) // comment
   println("a")
 >>>
-if (aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa &&
-    bbbbbbbbbbbbbbbbbb) // comment
+if (
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa &&
+    bbbbbbbbbbbbbbbbbb
+) // comment
   println("a")
 <<< If assignment
 val newColumn = if(split == Newline) newIndent
@@ -73,9 +77,11 @@ if ((gets2x(tok) ||
 lines(tok.between) > 1) &&
      !(isDocstring(left) && between)) 1
 >>>
-if ((gets2x(tok) ||
-    lines(tok.between) > 1) &&
-    !(isDocstring(left) && between)) 1
+if (
+    (gets2x(tok) ||
+      lines(tok.between) > 1) &&
+    !(isDocstring(left) && between)
+) 1
 <<< == unary nosplit literal, scalameta/scalameta#344
 if   (firstNewline == -1) tokLength
 >>>
@@ -120,11 +126,8 @@ object Bar {
 if (true) { a }
 else { 2 }
 >>>
-if (true) {
-  a
-} else {
-  2
-}
+if (true) { a }
+else { 2 }
 <<< #930 return
 if (true) return
 else println(1)
@@ -132,17 +135,25 @@ else println(1)
 if (true) return
 else println(1)
 <<< #1043
-      if ('0' <= ch && ch <= '9') { ch - '0' }
-      else if ('A' <= ch && ch <= 'F') { ch - 'A' + 10 }
-      else if ('a' <= ch && ch <= 'f') { ch - 'a' + 10 }
+      if ('0' <= c && c <= '9') { c - '0' }
+      else if ('A' <= c && c <= 'F') { c - 'A' + 10 }
+      else if ('a' <= c && c <= 'f') { c - 'a' + 10 }
       else { -1 }
 >>>
-if ('0' <= ch && ch <= '9') {
-  ch - '0'
-} else if ('A' <= ch && ch <= 'F') {
-  ch - 'A' + 10
-} else if ('a' <= ch && ch <= 'f') {
-  ch - 'a' + 10
-} else {
-  -1
-}
+if ('0' <= c && c <= '9') { c - '0' }
+else if ('A' <= c && c <= 'F') {
+  c - 'A' + 10
+} else if ('a' <= c && c <= 'f') {
+  c - 'a' + 10
+} else { -1 }
+<<< #1043 with lines joined
+      if ('0' <= c && c <= '9') { c - '0' }      else if ('A' <= c && c <= 'F') { c - 'A' + 10 }
+      else if ('a' <= c && c <= 'f') { c - 'a' + 10 }
+      else { -1 }
+>>>
+if ('0' <= c && c <= '9') { c - '0' }
+else if ('A' <= c && c <= 'F') {
+  c - 'A' + 10
+} else if ('a' <= c && c <= 'f') {
+  c - 'a' + 10
+} else { -1 }

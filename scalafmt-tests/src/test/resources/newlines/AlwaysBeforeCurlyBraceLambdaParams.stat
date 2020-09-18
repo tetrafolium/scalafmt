@@ -23,8 +23,7 @@ lst.map {
 lst.map { x => x }
 >>>
 lst.map {
-  x =>
-    x
+  x => x
 }
 <<< but preserve newlines if inserted
 lst.map {
